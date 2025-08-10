@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Vector Analysis</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { margin: 10px; padding: 10px 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f0f0f0; padding: 10px; }
+        table { border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>Test Vector Embedding Analysis</h1>
+    
+    <button onclick="runVectorAnalysis()">Run Vector Analysis</button>
+    <button onclick="checkStorage()">Check Storage</button>
+    <button onclick="clearStorage()">Clear Storage</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function runVectorAnalysis() {
+            const brandName = 'AVEA Life';
+            const phrases = ['NMN supplements', 'longevity', 'anti-aging'];
+            
+            document.getElementById('result').innerHTML = '<p>Running vector analysis...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/embedding-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        brand_name: brandName,
+                        tracked_phrases: phrases
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Store in localStorage
+                const storageKey = `analysis_${brandName}`;
+                localStorage.setItem(storageKey, JSON.stringify({
+                    entities: data.top_entities,
+                    brands: data.top_brands
+                }));
+                
+                // Display results
+                let html = `<h2 class="success">✅ Vector Analysis Complete!</h2>`;
+                html += `<p>Stored under key: <strong>${storageKey}</strong></p>`;
+                
+                html += '<h3>Top 5 Entities (B→E):</h3>';
+                html += '<table><tr><th>Entity</th><th>Similarity</th><th>Weight</th></tr>';
+                data.top_entities.slice(0, 5).forEach(e => {
+                    html += `<tr><td>${e.entity}</td><td>${e.frequency}</td><td>${e.weighted_score}</td></tr>`;
+                });
+                html += '</table>';
+                
+                html += '<h3>Top 5 Brands (E→B):</h3>';
+                html += '<table><tr><th>Brand</th><th>Similarity</th><th>Weight</th></tr>';
+                data.top_brands.slice(0, 5).forEach(b => {
+                    html += `<tr><td>${b.brand}</td><td>${b.frequency}</td><td>${b.weighted_score}</td></tr>`;
+                });
+                html += '</table>';
+                
+                document.getElementById('result').innerHTML = html;
+                
+                // Dispatch event
+                window.dispatchEvent(new CustomEvent('analysisComplete', { detail: { brandName } }));
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+        
+        function checkStorage() {
+            let html = '<h2>LocalStorage Contents:</h2>';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.includes('analysis')) {
+                    const value = localStorage.getItem(key);
+                    try {
+                        const data = JSON.parse(value);
+                        html += `<h3>${key}:</h3>`;
+                        if (data.entities) {
+                            html += `<p>Entities: ${data.entities.length} items</p>`;
+                            html += '<ul>';
+                            data.entities.slice(0, 3).forEach(e => {
+                                html += `<li>${e.entity} (weight: ${e.weighted_score})</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                        if (data.brands) {
+                            html += `<p>Brands: ${data.brands.length} items</p>`;
+                            html += '<ul>';
+                            data.brands.slice(0, 3).forEach(b => {
+                                html += `<li>${b.brand} (weight: ${b.weighted_score})</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                    } catch (e) {
+                        html += `<p>${key}: Parse error</p>`;
+                    }
+                }
+            }
+            document.getElementById('result').innerHTML = html;
+        }
+        
+        function clearStorage() {
+            localStorage.clear();
+            document.getElementById('result').innerHTML = '<p class="success">Storage cleared!</p>';
+        }
+    </script>
+</body>
+</html>

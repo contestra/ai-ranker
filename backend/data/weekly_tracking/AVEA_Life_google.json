@@ -1,0 +1,386 @@
+{
+  "brand_name": "AVEA Life",
+  "vendor": "google",
+  "entity_tracking": {
+    "AVEA": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 2,
+        "frequency": 4
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 1,
+        "frequency": 5
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 1,
+        "frequency": 5
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 2,
+        "frequency": 4
+      }
+    ],
+    "telecommunications": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 3,
+        "frequency": 4
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 3,
+        "frequency": 4
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 3,
+        "frequency": 4
+      }
+    ],
+    "longevity": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 5,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 3,
+        "frequency": 4
+      }
+    ],
+    "supplements": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 5,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 5,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 4,
+        "frequency": 3
+      }
+    ],
+    "Turkey": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 6,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 7,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 8,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 7,
+        "frequency": 2
+      }
+    ],
+    "wellness": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 7,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 6,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 6,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 5,
+        "frequency": 3
+      }
+    ],
+    "anti-aging": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 8,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 8,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 7,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 6,
+        "frequency": 2
+      }
+    ],
+    "vitamins": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 9,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 9,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 9,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 8,
+        "frequency": 1
+      }
+    ]
+  },
+  "phrase_tracking": {
+    "best longevity supplements": {
+      "Life Extension": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 9
+        }
+      ],
+      "Thorne Research": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 8
+        }
+      ],
+      "NOW Foods": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 7
+        }
+      ],
+      "AVEA Life": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 8,
+          "frequency": 2
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 7,
+          "frequency": 3
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 6,
+          "frequency": 4
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 5,
+          "frequency": 5
+        }
+      ],
+      "Garden of Life": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 6
+        }
+      ]
+    },
+    "Swiss supplements": {
+      "AVEA Life": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 5,
+          "frequency": 5
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 8
+        }
+      ],
+      "Burgerstein": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 9
+        }
+      ],
+      "A.Vogel": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 7
+        }
+      ],
+      "Biotta": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 6
+        }
+      ]
+    }
+  }
+}

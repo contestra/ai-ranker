@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flyctl status:*)",
+      "Bash(curl:*)",
+      "Bash(flyctl deploy:*)",
+      "Bash(flyctl machine update:*)",
+      "Bash(flyctl apps destroy:*)",
+      "Bash(flyctl launch:*)",
+      "Bash(flyctl secrets set:*)",
+      "Bash(flyctl machines list:*)",
+      "Bash(npm install:*)",
+      "Bash(flyctl logs:*)",
+      "Bash(nslookup:*)",
+      "Bash(flyctl ips:*)",
+      "Bash(flyctl machine restart:*)",
+      "Bash(flyctl apps open:*)",
+      "Bash(flyctl info:*)",
+      "Bash(flyctl ssh console:*)",
+      "Bash(flyctl apps:*)",
+      "Bash(flyctl scale:*)",
+      "Bash(flyctl machine list:*)",
+      "Bash(flyctl machine start:*)",
+      "WebFetch(domain:dejan.ai)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker:*)",
+      "Bash(psql:*)",
+      "Bash(npm run dev:*)",
+      "Bash(start http://localhost:3001)",
+      "Bash(start http://localhost:3002)",
+      "Bash(wmic process where:*)",
+      "Bash(taskkill:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": []
+  }
+}

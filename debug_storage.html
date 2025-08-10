@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug LocalStorage</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        button { margin: 10px; padding: 10px; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Debug LocalStorage for AI Ranker</h1>
+    
+    <div>
+        <button onclick="simulateAnalysis()">1. Simulate Full Analysis</button>
+        <button onclick="checkStorage()">2. Check Storage</button>
+        <button onclick="clearStorage()">3. Clear Storage</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function simulateAnalysis() {
+            const brandName = 'AVEA Life';
+            const phrases = [
+                'best longevity supplements',
+                'NMN supplements',
+                'NAD+ boosters'
+            ];
+            
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Calling backend...</p>';
+            
+            try {
+                // Call backend
+                const response = await fetch('http://localhost:8000/api/simple-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ brand_name: brandName, phrases })
+                });
+                
+                const data = await response.json();
+                
+                // Process and store data EXACTLY like Settings.tsx does
+                const aiVisData = {
+                    entities: data.entities.map((e, i) => ({
+                        entity: e,
+                        frequency: 20 - i,
+                        avg_position: 1 + (i * 0.3),
+                        weighted_score: 0.9 - (i * 0.08)
+                    })),
+                    brands: data.competitor_brands.map((b, i) => ({
+                        brand: b,
+                        frequency: 25 - i,
+                        avg_position: 1 + (i * 0.4),
+                        weighted_score: 0.85 - (i * 0.07)
+                    })).concat([{
+                        brand: brandName,
+                        frequency: 15,
+                        avg_position: 3.5,
+                        weighted_score: 0.45
+                    }])
+                };
+                
+                // Store everything
+                localStorage.setItem(`analysis_${brandName}`, JSON.stringify(aiVisData));
+                localStorage.setItem(`analysis_results_${brandName}`, JSON.stringify(data.analysis_results));
+                localStorage.setItem('trackedPhrases', JSON.stringify(phrases));
+                
+                resultDiv.innerHTML = `
+                    <h3 class="success">✓ Analysis Complete!</h3>
+                    <p>Backend returned:</p>
+                    <ul>
+                        <li>${data.entities.length} entities</li>
+                        <li>${data.competitor_brands.length} competitor brands</li>
+                        <li>${data.analysis_results.length} analysis results</li>
+                    </ul>
+                    <p>Stored in localStorage:</p>
+                    <ul>
+                        <li>analysis_${brandName}</li>
+                        <li>analysis_results_${brandName}</li>
+                        <li>trackedPhrases</li>
+                    </ul>
+                    <h4>Sample vendor results:</h4>
+                    <pre>${JSON.stringify(data.analysis_results.slice(0, 3), null, 2)}</pre>
+                `;
+                
+                // Dispatch event
+                window.dispatchEvent(new CustomEvent('analysisComplete', { detail: { brandName } }));
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+        
+        function checkStorage() {
+            const brandName = 'AVEA Life';
+            const keys = [
+                `analysis_${brandName}`,
+                `analysis_results_${brandName}`,
+                'trackedPhrases'
+            ];
+            
+            let html = '<h3>LocalStorage Contents:</h3>';
+            
+            keys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    const data = JSON.parse(value);
+                    html += `<h4>${key}:</h4>`;
+                    
+                    if (key === `analysis_results_${brandName}`) {
+                        // Group by vendor
+                        const byVendor = {};
+                        data.forEach(r => {
+                            if (!byVendor[r.vendor]) byVendor[r.vendor] = [];
+                            byVendor[r.vendor].push(r);
+                        });
+                        
+                        html += '<ul>';
+                        Object.keys(byVendor).forEach(vendor => {
+                            html += `<li>${vendor}: ${byVendor[vendor].length} results</li>`;
+                        });
+                        html += '</ul>';
+                        html += '<pre>' + JSON.stringify(data.slice(0, 2), null, 2) + '</pre>';
+                    } else if (Array.isArray(data)) {
+                        html += `<p>Array with ${data.length} items</p>`;
+                        html += '<pre>' + JSON.stringify(data.slice(0, 3), null, 2) + '</pre>';
+                    } else {
+                        html += `<p>Object with ${Object.keys(data).length} keys</p>`;
+                        if (data.entities) html += `<p>- entities: ${data.entities.length} items</p>`;
+                        if (data.brands) html += `<p>- brands: ${data.brands.length} items</p>`;
+                    }
+                } else {
+                    html += `<p class="error">${key}: NOT FOUND</p>`;
+                }
+            });
+            
+            document.getElementById('result').innerHTML = html;
+        }
+        
+        function clearStorage() {
+            localStorage.clear();
+            document.getElementById('result').innerHTML = '<p class="success">✓ All localStorage cleared!</p>';
+        }
+    </script>
+</body>
+</html>

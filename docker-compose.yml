@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airanker
+      POSTGRES_PASSWORD: airanker123
+      POSTGRES_DB: ai_ranker
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - airanker-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - airanker-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://airanker:airanker123@postgres:5432/ai_ranker
+      REDIS_URL: redis://redis:6379
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - airanker-network
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - airanker-network
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+
+networks:
+  airanker-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

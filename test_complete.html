@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { margin: 10px; padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Complete AI Ranker Test</h1>
+    
+    <div class="section">
+        <h2>Step 1: Clear Everything</h2>
+        <button onclick="clearAll()">Clear All Data</button>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Set Up Brand and Phrases</h2>
+        <button onclick="setupBrand()">Setup AVEA Life</button>
+    </div>
+    
+    <div class="section">
+        <h2>Step 3: Run Analysis</h2>
+        <button onclick="runAnalysis()">Run Full Analysis</button>
+    </div>
+    
+    <div class="section">
+        <h2>Step 4: Check Results</h2>
+        <button onclick="checkAllData()">Check All Data</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <script>
+        function clearAll() {
+            localStorage.clear()
+            document.getElementById('result').innerHTML = '<p class="success">✅ All localStorage cleared!</p>'
+        }
+        
+        function setupBrand() {
+            const brandName = 'AVEA Life'
+            const phrases = [
+                'best longevity supplements',
+                'NMN supplements',
+                'NAD+ boosters',
+                'anti-aging products',
+                'cellular health supplements'
+            ]
+            
+            localStorage.setItem('trackedPhrases', JSON.stringify(phrases))
+            
+            document.getElementById('result').innerHTML = `
+                <p class="success">✅ Setup complete!</p>
+                <p>Brand: ${brandName}</p>
+                <p>Phrases: ${phrases.length}</p>
+                <ul>${phrases.map(p => `<li>${p}</li>`).join('')}</ul>
+            `
+        }
+        
+        async function runAnalysis() {
+            const brandName = 'AVEA Life'
+            const phrases = JSON.parse(localStorage.getItem('trackedPhrases') || '[]')
+            
+            if (phrases.length === 0) {
+                document.getElementById('result').innerHTML = '<p class="error">❌ Please setup brand and phrases first!</p>'
+                return
+            }
+            
+            document.getElementById('result').innerHTML = '<p class="info">⏳ Running analysis...</p>'
+            
+            try {
+                console.log('Calling backend with:', { brandName, phrases })
+                
+                const response = await fetch('http://localhost:8000/api/simple-analysis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        brand_name: brandName,
+                        phrases: phrases
+                    })
+                })
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`)
+                }
+                
+                const data = await response.json()
+                console.log('Backend response:', data)
+                
+                // Store AI Visibility data
+                const aiVisData = {
+                    entities: data.entities.map((e, i) => ({
+                        entity: e,
+                        frequency: 20 - i,
+                        avg_position: 1 + (i * 0.3),
+                        weighted_score: 0.9 - (i * 0.08)
+                    })),
+                    brands: data.competitor_brands.map((b, i) => ({
+                        brand: b,
+                        frequency: 25 - i,
+                        avg_position: 1 + (i * 0.4),
+                        weighted_score: 0.85 - (i * 0.07)
+                    })).concat([{
+                        brand: brandName,
+                        frequency: 15,
+                        avg_position: 3.5,
+                        weighted_score: 0.45
+                    }])
+                }
+                
+                localStorage.setItem(`analysis_${brandName}`, JSON.stringify(aiVisData))
+                localStorage.setItem(`analysis_results_${brandName}`, JSON.stringify(data.analysis_results))
+                
+                // Group results by vendor
+                const byVendor = {}
+                data.analysis_results.forEach(r => {
+                    if (!byVendor[r.vendor]) byVendor[r.vendor] = []
+                    byVendor[r.vendor].push(r)
+                })
+                
+                document.getElementById('result').innerHTML = `
+                    <p class="success">✅ Analysis complete!</p>
+                    <h3>Backend Response:</h3>
+                    <ul>
+                        <li>Entities: ${data.entities.length}</li>
+                        <li>Competitor Brands: ${data.competitor_brands.length}</li>
+                        <li>Total Results: ${data.analysis_results.length}</li>
+                    </ul>
+                    <h3>Results by Vendor:</h3>
+                    <ul>
+                        ${Object.entries(byVendor).map(([v, results]) => 
+                            `<li>${v}: ${results.length} results</li>`
+                        ).join('')}
+                    </ul>
+                    <h3>Stored in localStorage:</h3>
+                    <ul>
+                        <li>analysis_${brandName}: ✅</li>
+                        <li>analysis_results_${brandName}: ✅</li>
+                    </ul>
+                    <p class="info">Now refresh the main app at http://localhost:3002</p>
+                `
+                
+                // Dispatch event like the app does
+                window.dispatchEvent(new CustomEvent('analysisComplete', { detail: { brandName } }))
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p class="error">❌ Error: ${error.message}</p>`
+                console.error('Analysis error:', error)
+            }
+        }
+        
+        function checkAllData() {
+            const brandName = 'AVEA Life'
+            const keys = [
+                `analysis_${brandName}`,
+                `analysis_results_${brandName}`,
+                'trackedPhrases'
+            ]
+            
+            let html = '<h2>Current LocalStorage Data:</h2>'
+            
+            keys.forEach(key => {
+                const value = localStorage.getItem(key)
+                if (value) {
+                    try {
+                        const data = JSON.parse(value)
+                        
+                        if (key === `analysis_results_${brandName}`) {
+                            const byVendor = {}
+                            data.forEach(r => {
+                                if (!byVendor[r.vendor]) byVendor[r.vendor] = []
+                                byVendor[r.vendor].push(r)
+                            })
+                            
+                            html += `<div class="section">`
+                            html += `<h3>${key}:</h3>`
+                            html += '<p>Results by vendor:</p><ul>'
+                            Object.entries(byVendor).forEach(([vendor, results]) => {
+                                html += `<li><strong>${vendor}:</strong> ${results.length} results`
+                                if (results.length > 0) {
+                                    html += '<ul>'
+                                    results.forEach(r => {
+                                        html += `<li>"${r.phrase}" - ${r.brands_found.length} brands found`
+                                        if (r.brand_mentioned) {
+                                            html += ` (AVEA at position ${r.position})`
+                                        } else {
+                                            html += ' (AVEA not mentioned)'
+                                        }
+                                        html += '</li>'
+                                    })
+                                    html += '</ul>'
+                                }
+                                html += '</li>'
+                            })
+                            html += '</ul></div>'
+                            
+                        } else if (key === `analysis_${brandName}`) {
+                            html += `<div class="section">`
+                            html += `<h3>${key}:</h3>`
+                            html += `<p>Entities: ${data.entities?.length || 0}</p>`
+                            html += `<p>Brands: ${data.brands?.length || 0}</p>`
+                            if (data.entities && data.entities.length > 0) {
+                                html += '<p>Top 3 entities:</p><ul>'
+                                data.entities.slice(0, 3).forEach(e => {
+                                    html += `<li>${e.entity} (score: ${e.weighted_score.toFixed(2)})</li>`
+                                })
+                                html += '</ul>'
+                            }
+                            html += '</div>'
+                            
+                        } else {
+                            html += `<div class="section">`
+                            html += `<h3>${key}:</h3>`
+                            html += `<p>${Array.isArray(data) ? data.length : Object.keys(data).length} items</p>`
+                            html += `<pre>${JSON.stringify(data, null, 2).substring(0, 300)}...</pre>`
+                            html += '</div>'
+                        }
+                    } catch (e) {
+                        html += `<p class="error">${key}: Parse error</p>`
+                    }
+                } else {
+                    html += `<p class="error">${key}: NOT FOUND</p>`
+                }
+            })
+            
+            document.getElementById('result').innerHTML = html
+        }
+    </script>
+</body>
+</html>

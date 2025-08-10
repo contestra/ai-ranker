@@ -1,0 +1,66 @@
+<\!DOCTYPE html>
+<html>
+<head>
+    <title>Test Analysis Storage</title>
+</head>
+<body>
+    <h1>Test Analysis Data Storage</h1>
+    <button onclick="storeTestData()">Store Test Data for AVEA Life</button>
+    <button onclick="checkData()">Check Stored Data</button>
+    <div id="result"></div>
+    
+    <script>
+        function storeTestData() {
+            const brandName = 'AVEA Life';
+            
+            // Store analysis results for AI Visibility
+            localStorage.setItem(`analysis_${brandName}`, JSON.stringify({
+                entities: [
+                    { entity: 'longevity', frequency: 45, avg_position: 1.2, weighted_score: 0.85 },
+                    { entity: 'NMN', frequency: 42, avg_position: 1.5, weighted_score: 0.78 },
+                    { entity: 'NAD+', frequency: 38, avg_position: 1.8, weighted_score: 0.72 },
+                    { entity: 'supplements', frequency: 35, avg_position: 2.0, weighted_score: 0.65 },
+                    { entity: 'anti-aging', frequency: 30, avg_position: 2.3, weighted_score: 0.58 }
+                ],
+                brands: [
+                    { brand: 'Elysium Health', frequency: 48, avg_position: 1.5, weighted_score: 0.82 },
+                    { brand: 'AVEA Life', frequency: 40, avg_position: 2.2, weighted_score: 0.68 },
+                    { brand: 'Tru Niagen', frequency: 38, avg_position: 2.5, weighted_score: 0.62 },
+                    { brand: 'Life Extension', frequency: 35, avg_position: 2.8, weighted_score: 0.55 },
+                    { brand: 'Thorne', frequency: 30, avg_position: 3.0, weighted_score: 0.48 }
+                ]
+            }));
+            
+            // Store analysis results for vendor tabs
+            localStorage.setItem(`analysis_results_${brandName}`, JSON.stringify([
+                {
+                    phrase: 'best longevity supplements',
+                    vendor: 'openai',
+                    brands_found: ['Elysium Health', 'Tru Niagen', 'AVEA Life', 'Life Extension', 'Thorne'],
+                    brand_mentioned: true,
+                    position: 3
+                },
+                {
+                    phrase: 'NMN supplements',
+                    vendor: 'openai',
+                    brands_found: ['Tru Niagen', 'Elysium Health', 'Life Extension', 'ProHealth', 'AVEA Life'],
+                    brand_mentioned: true,
+                    position: 5
+                }
+            ]));
+            
+            document.getElementById('result').innerHTML = 'Test data stored\! Refresh the main app to see results.';
+        }
+        
+        function checkData() {
+            const brandName = 'AVEA Life';
+            const aiVisData = localStorage.getItem(`analysis_${brandName}`);
+            const vendorData = localStorage.getItem(`analysis_results_${brandName}`);
+            
+            document.getElementById('result').innerHTML = 
+                '<h3>AI Visibility Data:</h3><pre>' + aiVisData + '</pre>' +
+                '<h3>Vendor Data:</h3><pre>' + vendorData + '</pre>';
+        }
+    </script>
+</body>
+</html>

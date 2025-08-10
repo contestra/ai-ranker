@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Full Analysis</title>
+</head>
+<body>
+    <h1>Test Full AI Analysis</h1>
+    <button onclick="runFullAnalysis()">Run Full Analysis for AVEA Life</button>
+    <button onclick="checkAllData()">Check All Stored Data</button>
+    <button onclick="clearData()">Clear All Data</button>
+    <div id="result"></div>
+    
+    <script>
+        async function runFullAnalysis() {
+            const brandName = 'AVEA Life';
+            const phrases = [
+                'best longevity supplements',
+                'NMN supplements',
+                'NAD+ boosters',
+                'anti-aging products'
+            ];
+            
+            document.getElementById('result').innerHTML = 'Running analysis...';
+            
+            try {
+                // Call the backend
+                const response = await fetch('http://localhost:8000/api/simple-analysis', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        brand_name: brandName,
+                        phrases: phrases
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Backend response:', data);
+                
+                // Store results for AI Visibility tab
+                const aiVisData = {
+                    entities: data.entities.map((e, i) => ({
+                        entity: e,
+                        frequency: 30 - i * 2,
+                        avg_position: 1 + (i * 0.3),
+                        weighted_score: 0.9 - (i * 0.05)
+                    })),
+                    brands: data.competitor_brands.map((b, i) => ({
+                        brand: b,
+                        frequency: 35 - i * 3,
+                        avg_position: 1 + (i * 0.4),
+                        weighted_score: 0.85 - (i * 0.06)
+                    })).concat([{
+                        brand: brandName,
+                        frequency: 22,
+                        avg_position: 3.2,
+                        weighted_score: 0.52
+                    }])
+                };
+                
+                localStorage.setItem(`analysis_${brandName}`, JSON.stringify(aiVisData));
+                
+                // Store analysis results for vendor tabs
+                localStorage.setItem(`analysis_results_${brandName}`, JSON.stringify(data.analysis_results));
+                
+                // Store tracked phrases
+                localStorage.setItem('trackedPhrases', JSON.stringify(phrases));
+                
+                document.getElementById('result').innerHTML = 
+                    '<h3>Analysis Complete!</h3>' +
+                    '<p>Stored data for:</p>' +
+                    '<ul>' +
+                    '<li>' + data.entities.length + ' entities</li>' +
+                    '<li>' + data.competitor_brands.length + ' competitor brands</li>' +
+                    '<li>' + data.analysis_results.length + ' analysis results</li>' +
+                    '</ul>' +
+                    '<p>Refresh the main app at http://localhost:3002 to see results.</p>';
+                    
+                // Dispatch event
+                window.dispatchEvent(new CustomEvent('analysisComplete', { detail: { brandName } }));
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+        
+        function checkAllData() {
+            const brandName = 'AVEA Life';
+            const aiVisData = localStorage.getItem(`analysis_${brandName}`);
+            const vendorData = localStorage.getItem(`analysis_results_${brandName}`);
+            const phrases = localStorage.getItem('trackedPhrases');
+            
+            let html = '<h3>Stored Data:</h3>';
+            
+            if (aiVisData) {
+                const data = JSON.parse(aiVisData);
+                html += '<h4>AI Visibility Data:</h4>';
+                html += '<p>Entities: ' + data.entities.length + '</p>';
+                html += '<p>Brands: ' + data.brands.length + '</p>';
+            }
+            
+            if (vendorData) {
+                const data = JSON.parse(vendorData);
+                html += '<h4>Vendor Results:</h4>';
+                const byVendor = {};
+                data.forEach(r => {
+                    byVendor[r.vendor] = (byVendor[r.vendor] || 0) + 1;
+                });
+                Object.keys(byVendor).forEach(v => {
+                    html += '<p>' + v + ': ' + byVendor[v] + ' results</p>';
+                });
+            }
+            
+            if (phrases) {
+                const data = JSON.parse(phrases);
+                html += '<h4>Tracked Phrases:</h4>';
+                html += '<p>' + data.length + ' phrases</p>';
+            }
+            
+            document.getElementById('result').innerHTML = html;
+        }
+        
+        function clearData() {
+            localStorage.removeItem('analysis_AVEA Life');
+            localStorage.removeItem('analysis_results_AVEA Life');
+            localStorage.removeItem('trackedPhrases');
+            document.getElementById('result').innerHTML = 'All data cleared!';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear and Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { margin: 10px; padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .clear { background: #f44336; }
+        .clear:hover { background: #da190b; }
+    </style>
+</head>
+<body>
+    <h1>Clear LocalStorage and Test</h1>
+    
+    <button class="clear" onclick="clearAll()">🗑️ Clear All LocalStorage</button>
+    <button onclick="window.location.href='http://localhost:3002'">🚀 Open App</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        function clearAll() {
+            const count = localStorage.length;
+            localStorage.clear();
+            document.getElementById('result').innerHTML = `
+                <h2 style="color: green;">✅ Cleared ${count} items from localStorage!</h2>
+                <p>The app will now start with a clean slate.</p>
+                <p>Click "Open App" to go to the application.</p>
+            `;
+        }
+        
+        // Show current status
+        window.onload = () => {
+            const count = localStorage.length;
+            if (count > 0) {
+                document.getElementById('result').innerHTML = `
+                    <h2>Current Status:</h2>
+                    <p>LocalStorage contains ${count} items.</p>
+                    <p>Click "Clear All LocalStorage" to remove them.</p>
+                `;
+            } else {
+                document.getElementById('result').innerHTML = `
+                    <h2 style="color: green;">LocalStorage is empty!</h2>
+                    <p>Ready to start fresh.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

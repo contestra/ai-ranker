@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Storage</title>
+</head>
+<body>
+    <h1>Check LocalStorage Contents</h1>
+    <button onclick="showAll()">Show All Keys</button>
+    <button onclick="clearAll()">Clear All</button>
+    <div id="result"></div>
+    
+    <script>
+        function showAll() {
+            let html = '<h2>All LocalStorage Keys:</h2><ul>';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                let preview = value;
+                try {
+                    const parsed = JSON.parse(value);
+                    if (parsed.entities && parsed.brands) {
+                        preview = `Entities: ${parsed.entities.length}, Brands: ${parsed.brands.length}`;
+                    } else if (Array.isArray(parsed)) {
+                        preview = `Array with ${parsed.length} items`;
+                    } else {
+                        preview = `Object with ${Object.keys(parsed).length} keys`;
+                    }
+                } catch (e) {
+                    preview = value.substring(0, 100) + '...';
+                }
+                html += `<li><strong>${key}:</strong> ${preview}</li>`;
+            }
+            html += '</ul>';
+            document.getElementById('result').innerHTML = html;
+        }
+        
+        function clearAll() {
+            localStorage.clear();
+            document.getElementById('result').innerHTML = '<p>Cleared!</p>';
+        }
+        
+        // Auto-show on load
+        window.onload = showAll;
+    </script>
+</body>
+</html>
