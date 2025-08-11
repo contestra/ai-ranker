@@ -115,14 +115,11 @@ def create_natural_prompt(brand_name: str) -> tuple[str, str]:
     Create a natural, unbiased prompt for information gathering
     No classification request, no testing indication
     """
-    system_prompt = """You are a helpful assistant providing information about companies and brands.
-Be comprehensive and specific in your responses. If you know of multiple entities with the same name, 
-mention all of them with clear distinctions."""
+    # No system prompt - keep it naked
+    system_prompt = ""
     
-    # Natural, conversational prompt - no hint that we're testing
-    user_prompt = f"""Tell me about {brand_name}. What do they do, where are they based, 
-and what are they known for? If there are multiple companies or entities with this name, 
-please describe each one."""
+    # User's exact prompt
+    user_prompt = f"""Tell me about the brand {brand_name}. Tell me the top 20 things you associate with the brand. Also, what do they do, where are they based, and what are they known for?"""
     
     return system_prompt, user_prompt
 
@@ -254,14 +251,18 @@ async def check_brand_entity_strength_v2(request: BrandEntityRequestV2):
     try:
         # Get information from primary model
         import asyncio
+        # Only pass system_prompt if it's not empty
+        generate_params = {
+            "vendor": request.information_vendor,
+            "prompt": user_prompt,
+            "temperature": 0.3,
+            "max_tokens": 1500
+        }
+        if system_prompt:  # Only add system_prompt if not empty
+            generate_params["system_prompt"] = system_prompt
+            
         information_response = await asyncio.wait_for(
-            adapter.generate(
-                vendor=request.information_vendor,
-                prompt=user_prompt,
-                system_prompt=system_prompt,
-                temperature=0.3,
-                max_tokens=1500
-            ),
+            adapter.generate(**generate_params),
             timeout=60
         )
         

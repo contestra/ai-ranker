@@ -4,18 +4,32 @@ import { useState, useEffect } from 'react'
 import { CheckCircleIcon, XCircleIcon, QuestionMarkCircleIcon, ExclamationTriangleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline'
 
 interface EntityClassification {
-  label: 'KNOWN_STRONG' | 'KNOWN_WEAK' | 'UNKNOWN' | 'EMPTY' | 'HALLUCINATED'
+  label: 'KNOWN_STRONG' | 'KNOWN_WEAK' | 'UNKNOWN' | 'EMPTY' | 'CONFUSED'
   confidence: number
-  reasoning?: string
-  response_text?: string  // The AI's natural language response about the brand
-  specific_claims: string[]
-  generic_claims: string[]
+  reasoning: string
+  natural_response?: string  // The unbiased response from Step 1 (v2)
+  response_text?: string  // The AI's natural language response (v1)
+  classifier_analysis?: {  // Analysis from Step 2 (v2)
+    specific_facts: number
+    generic_claims: number
+    entities_mentioned: number
+    multiple_entities: boolean
+    classification: string
+    confidence: number
+    reasoning: string
+  }
+  specific_facts_count?: number  // v2
+  generic_claims_count?: number  // v2
+  entities_mentioned?: string[]  // v2
+  specific_claims?: string[]  // v1
+  generic_claims?: string[]  // v1
+  disambiguation_needed?: boolean
   confusion_detected?: boolean
   confusion_type?: string
   ai_thinks_industry?: string
   actual_industry?: string
-  disambiguation_needed?: boolean
   other_entities_list?: string[]
+  methodology?: 'single-step' | 'two-step'
 }
 
 interface BrandStrengthResult {
@@ -54,14 +68,15 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
       // Set timeout to 120 seconds for GPT-5 (which is slow)
       const timeoutId = setTimeout(() => controller.abort(), 120000)
       
-      const response = await fetch('http://localhost:8000/api/brand-entity-strength', {
+      // Use the new v2 endpoint for two-step approach
+      const response = await fetch('http://localhost:8000/api/brand-entity-strength-v2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_name: brand,
           domain: brandDomain || undefined,
-          vendor: vendor,
-          include_reasoning: true
+          information_vendor: vendor,  // Changed from 'vendor' to 'information_vendor'
+          classifier_vendor: 'openai'  // Always use GPT-4o-mini for classification
         }),
         signal: controller.signal
       })
@@ -136,12 +151,12 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
     setBatchLoading(true)
     
     try {
-      const response = await fetch('http://localhost:8000/api/brand-entity-strength/batch', {
+      const response = await fetch('http://localhost:8000/api/brand-entity-strength-v2/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brands: newBrands,
-          vendor: vendor
+          information_vendor: vendor
         })
       })
 
@@ -402,31 +417,62 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
               </div>
             )}
 
-            {/* Claims */}
+            {/* Claims - Handle both v1 and v2 formats */}
             <div className="grid grid-cols-2 gap-4">
-              {primaryBrand.specific_claims.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">
-                    {primaryBrand.reasoning && primaryBrand.reasoning.toLowerCase().includes('but actual brand') 
-                      ? "What AI Thinks (WRONG)" 
-                      : "Specific Knowledge"}
-                  </h4>
-                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                    {primaryBrand.specific_claims.slice(0, 3).map((claim, idx) => (
-                      <li key={idx}>{claim}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {primaryBrand.generic_claims.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Generic Claims</h4>
-                  <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                    {primaryBrand.generic_claims.slice(0, 3).map((claim, idx) => (
-                      <li key={idx}>{claim}</li>
-                    ))}
-                  </ul>
-                </div>
+              {/* For v2: Show facts count and entities */}
+              {primaryBrand.methodology === 'two-step' ? (
+                <>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Knowledge Quality</h4>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <div>• Specific Facts: {primaryBrand.specific_facts_count || 0}</div>
+                      <div>• Generic Claims: {primaryBrand.generic_claims_count || 0}</div>
+                      <div>• Fact Ratio: {
+                        primaryBrand.specific_facts_count && (primaryBrand.specific_facts_count + (primaryBrand.generic_claims_count || 0)) > 0
+                          ? Math.round((primaryBrand.specific_facts_count / (primaryBrand.specific_facts_count + (primaryBrand.generic_claims_count || 0))) * 100)
+                          : 0
+                      }%</div>
+                    </div>
+                  </div>
+                  {primaryBrand.entities_mentioned && primaryBrand.entities_mentioned.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Entities Detected</h4>
+                      <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                        {primaryBrand.entities_mentioned.slice(0, 3).map((entity, idx) => (
+                          <li key={idx}>{entity}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* For v1: Show specific and generic claims */}
+                  {primaryBrand.specific_claims && primaryBrand.specific_claims.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        {primaryBrand.reasoning && primaryBrand.reasoning.toLowerCase().includes('but actual brand') 
+                          ? "What AI Thinks (WRONG)" 
+                          : "Specific Knowledge"}
+                      </h4>
+                      <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                        {primaryBrand.specific_claims.slice(0, 3).map((claim, idx) => (
+                          <li key={idx}>{claim}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {primaryBrand.generic_claims && primaryBrand.generic_claims.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Generic Claims</h4>
+                      <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                        {primaryBrand.generic_claims.slice(0, 3).map((claim, idx) => (
+                          <li key={idx}>{claim}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -570,13 +616,46 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
       {/* Raw AI Response */}
       {primaryBrand && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <h4 className="text-sm font-medium text-gray-900 mb-3">AI Model Response</h4>
+          <h4 className="text-sm font-medium text-gray-900 mb-3">
+            AI Model Response {primaryBrand.methodology === 'two-step' && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">Two-Step Analysis</span>}
+          </h4>
           
           {/* Show the AI's actual response text if available */}
-          {primaryBrand.response_text && (
+          {(primaryBrand.natural_response || primaryBrand.response_text) && (
             <div className="mb-4 p-3 bg-white rounded-lg border border-gray-300">
-              <h5 className="text-xs font-semibold text-gray-700 mb-2 uppercase">What the AI Said:</h5>
-              <p className="text-sm text-gray-800 whitespace-pre-wrap">{primaryBrand.response_text}</p>
+              <h5 className="text-xs font-semibold text-gray-700 mb-2 uppercase">
+                {primaryBrand.methodology === 'two-step' ? 'Step 1: Natural AI Response' : 'What the AI Said:'}
+              </h5>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{primaryBrand.natural_response || primaryBrand.response_text}</p>
+            </div>
+          )}
+          
+          {/* Show classifier analysis for two-step */}
+          {primaryBrand.methodology === 'two-step' && primaryBrand.classifier_analysis && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <h5 className="text-xs font-semibold text-blue-900 mb-2 uppercase">Step 2: Classification Analysis (GPT-4o-mini)</h5>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="font-medium text-blue-700">Specific Facts:</span>{' '}
+                  <span className="text-blue-900">{primaryBrand.classifier_analysis.specific_facts}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-700">Generic Claims:</span>{' '}
+                  <span className="text-blue-900">{primaryBrand.classifier_analysis.generic_claims}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-700">Entities Found:</span>{' '}
+                  <span className="text-blue-900">{primaryBrand.classifier_analysis.entities_mentioned}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-blue-700">Multiple Entities:</span>{' '}
+                  <span className="text-blue-900">{primaryBrand.classifier_analysis.multiple_entities ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+              <div className="mt-2">
+                <span className="font-medium text-blue-700 text-sm">Classifier Reasoning:</span>{' '}
+                <span className="text-blue-900 text-sm">{primaryBrand.classifier_analysis.reasoning}</span>
+              </div>
             </div>
           )}
           
