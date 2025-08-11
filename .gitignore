@@ -81,3 +81,11 @@ fly.toml.backup
 nul
 *.bak
 *.backup
+
+# Private documentation
+250810 V2 How to build Dejan - ChatGPT 5 Pro.md
+*Dejan*.md
+*dejan*.md
+
+# Robots.txt analysis files
+/robots/

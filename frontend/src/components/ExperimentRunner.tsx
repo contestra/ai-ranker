@@ -10,12 +10,10 @@ interface ExperimentRunnerProps {
 
 const modelOptions: Record<string, { name: string; model: string }[]> = {
   openai: [
-    { name: 'GPT-5', model: 'gpt-5' },
-    { name: 'GPT-4 Turbo', model: 'gpt-4-turbo' }
+    { name: 'GPT-5', model: 'gpt-5' }
   ],
   google: [
-    { name: 'Gemini 1.5 Flash', model: 'gemini-1.5-flash' },
-    { name: 'Gemini 1.5 Pro', model: 'gemini-1.5-pro' }
+    { name: 'Gemini 2.5 Pro', model: 'gemini-2.5-pro' }
   ],
   anthropic: [
     { name: 'Claude 3.5 Sonnet', model: 'claude-3-5-sonnet-20241022' },

@@ -40,18 +40,43 @@ def extract_entities_from_text(text: str) -> Set[str]:
     """
     entities = set()
     
+    # Common junk phrases to filter out
+    junk_phrases = {
+        'my last update', 'my last training', 'my knowledge', 'my training data',
+        'more details', 'more specific details', 'specific details', 'details',
+        'example', 'examples', 'for example', 'such as',
+        'information', 'additional information', 'more information',
+        'context', 'the context', 'this context',
+        'response', 'the response', 'my response',
+        'hypothetical', 'fictional', 'real world',
+        'update', 'last update', 'as of',
+        'i can', 'i cannot', 'i would', 'i could',
+        'please note', 'note that', 'however',
+        'list', 'the list', 'a list',
+        'top', 'the top', 'top 10',
+        'things', 'the things', 'these things',
+        'question', 'the question', 'your question',
+        'answer', 'the answer', 'my answer',
+        'based on', 'according to', 'depending on'
+    }
+    
     # Use spaCy NER
     doc = nlp(text)
     
     # Extract named entities
     for ent in doc.ents:
         if ent.label_ in ["ORG", "PRODUCT", "PERSON", "GPE", "LOC"]:
-            entities.add(ent.text)
+            # Filter out junk
+            if ent.text.lower() not in junk_phrases:
+                entities.add(ent.text)
     
     # Extract noun phrases that might be services/products
     for chunk in doc.noun_chunks:
-        # Skip single common words
-        if len(chunk.text.split()) > 1 or chunk.text.lower() not in ['it', 'they', 'this', 'that']:
+        chunk_lower = chunk.text.lower().strip()
+        # Skip single common words and junk phrases
+        if (len(chunk.text.split()) > 1 and 
+            chunk_lower not in junk_phrases and
+            not any(junk in chunk_lower for junk in ['my last', 'more details', 'specific details', 'for example'])):
             entities.add(chunk.text)
     
     # Pattern matching for specific types
@@ -79,17 +104,45 @@ def extract_entities_from_text(text: str) -> Set[str]:
 
 def normalize_entities(entities: Set[str]) -> List[str]:
     """
-    Normalize and deduplicate entities
+    Normalize and deduplicate entities, filtering out junk
     """
     normalized = {}
     
+    # Additional filters for low-quality entities
+    skip_patterns = [
+        'my last', 'more details', 'specific details', 'for example',
+        'such as', 'as of', 'based on', 'according to',
+        'i can', 'i would', 'please note', 'the following'
+    ]
+    
     for entity in entities:
+        entity_clean = entity.strip()
+        
+        # Skip too short or too long
+        if len(entity_clean) < 3 or len(entity_clean) > 100:
+            continue
+            
+        # Skip if it's mostly punctuation or numbers
+        if sum(c.isalpha() for c in entity_clean) < len(entity_clean) * 0.5:
+            continue
+            
+        # Skip if contains junk patterns
+        entity_lower = entity_clean.lower()
+        if any(skip in entity_lower for skip in skip_patterns):
+            continue
+            
+        # Skip generic single words
+        if entity_lower in {'it', 'they', 'this', 'that', 'what', 'when', 'where', 
+                           'how', 'why', 'who', 'which', 'some', 'any', 'all',
+                           'one', 'two', 'three', 'services', 'products', 'company'}:
+            continue
+        
         # Create a normalized key for deduplication
-        key = entity.lower().strip()
+        key = entity_lower
         
         # Keep the better formatted version
         if key not in normalized or len(entity) > len(normalized[key]):
-            normalized[key] = entity
+            normalized[key] = entity_clean
     
     return list(normalized.values())
 
@@ -207,40 +260,40 @@ async def run_entity_beeb(request: EntityBEEBRequest):
                     max_tokens=200 if vendor != "google" else None
                 )
             
-            # Extract brand names from response
-            brands = extract_entities_from_text(response["text"])
+                # Extract brand names from response
+                brands = extract_entities_from_text(response["text"])
             
-            for brand in list(brands)[:10]:
-                # Get brand embedding and calculate similarity to phrase
-                try:
-                    brand_embedding = await adapter.get_embedding(vendor, brand)
-                    phrase_embedding = await adapter.get_embedding(vendor, phrase)
-                    
-                    brand_vec = np.array(brand_embedding)
-                    phrase_vec = np.array(phrase_embedding)
-                    
-                    # Normalize
-                    brand_norm = np.linalg.norm(brand_vec)
-                    phrase_norm = np.linalg.norm(phrase_vec)
-                    
-                    if brand_norm > 0 and phrase_norm > 0:
-                        brand_vec = brand_vec / brand_norm
-                        phrase_vec = phrase_vec / phrase_norm
-                        similarity = float(np.dot(brand_vec, phrase_vec))
+                for brand in list(brands)[:10]:
+                    # Get brand embedding and calculate similarity to phrase
+                    try:
+                        brand_embedding = await adapter.get_embedding(vendor, brand)
+                        phrase_embedding = await adapter.get_embedding(vendor, phrase)
                         
-                        brand_associations.append({
-                            "brand": brand,
-                            "phrase": phrase,
-                            "similarity": similarity,
-                            "frequency": 1,
-                            "avg_position": 1 + (1 - similarity) * 9,
-                            "weighted_score": similarity
-                        })
-                except Exception as e:
-                    print(f"Error processing brand '{brand}': {str(e)}")
+                        brand_vec = np.array(brand_embedding)
+                        phrase_vec = np.array(phrase_embedding)
+                        
+                        # Normalize
+                        brand_norm = np.linalg.norm(brand_vec)
+                        phrase_norm = np.linalg.norm(phrase_vec)
+                        
+                        if brand_norm > 0 and phrase_norm > 0:
+                            brand_vec = brand_vec / brand_norm
+                            phrase_vec = phrase_vec / phrase_norm
+                            similarity = float(np.dot(brand_vec, phrase_vec))
+                            
+                            brand_associations.append({
+                                "brand": brand,
+                                "phrase": phrase,
+                                "similarity": similarity,
+                                "frequency": 1,
+                                "avg_position": 1 + (1 - similarity) * 9,
+                                "weighted_score": similarity
+                            })
+                    except Exception as e:
+                        print(f"Error processing brand '{brand}': {str(e)}")
                     
-        except Exception as e:
-            print(f"Error processing phrase '{phrase}': {str(e)}")
+            except Exception as e:
+                print(f"Error processing phrase '{phrase}': {str(e)}")
     
     # Aggregate and sort brand associations
     brand_scores = {}

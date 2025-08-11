@@ -33,7 +33,15 @@
       "Bash(start http://localhost:3002)",
       "Bash(wmic process where:*)",
       "Bash(taskkill:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(find:*)",
+      "Bash(sed:*)",
+      "Bash(start http://localhost:3004)",
+      "Bash(npm run build:*)",
+      "Bash(npx next:*)",
+      "Bash(dir:*)",
+      "Bash(powershell:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

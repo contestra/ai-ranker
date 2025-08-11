@@ -177,6 +177,13 @@
         "rank": 8,
         "frequency": 1
       }
+    ],
+    "undefined": [
+      {
+        "week_start": "2025-08-04",
+        "rank": 10,
+        "frequency": 2
+      }
     ]
   },
   "phrase_tracking": {
@@ -200,7 +207,7 @@
         {
           "week_start": "2025-08-04",
           "rank": 1,
-          "frequency": 9
+          "frequency": 11
         }
       ],
       "Thorne Research": [
@@ -221,8 +228,8 @@
         },
         {
           "week_start": "2025-08-04",
-          "rank": 2,
-          "frequency": 8
+          "rank": 6,
+          "frequency": 9
         }
       ],
       "NOW Foods": [
@@ -243,8 +250,8 @@
         },
         {
           "week_start": "2025-08-04",
-          "rank": 3,
-          "frequency": 7
+          "rank": 2,
+          "frequency": 9
         }
       ],
       "AVEA Life": [
@@ -287,8 +294,71 @@
         },
         {
           "week_start": "2025-08-04",
+          "rank": 8,
+          "frequency": 8
+        }
+      ],
+      "Thorne": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 1
+        }
+      ],
+      "Pure Encapsulations": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 7,
+          "frequency": 2
+        }
+      ],
+      "Solgar": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 2
+        }
+      ],
+      "Jarrow Formulas": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 5,
+          "frequency": 2
+        }
+      ],
+      "Swanson": [
+        {
+          "week_start": "2025-08-04",
           "rank": 4,
-          "frequency": 6
+          "frequency": 2
+        }
+      ],
+      "Nature's Way": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 8,
+          "frequency": 1
+        }
+      ],
+      "Nordic Naturals": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 10,
+          "frequency": 1
+        }
+      ],
+      "Nature's Bounty": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 9,
+          "frequency": 1
+        }
+      ],
+      "Doctor's Best": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 10,
+          "frequency": 1
         }
       ]
     },
@@ -379,6 +449,99 @@
           "week_start": "2025-08-04",
           "rank": 4,
           "frequency": 6
+        }
+      ]
+    },
+    "best swiss supplements": {
+      "Swisse": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 2
+        }
+      ],
+      "Burgerstein": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 2
+        }
+      ],
+      "VitaHealth": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 1
+        }
+      ],
+      "Biotta": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 2
+        }
+      ],
+      "Similasan": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 2
+        }
+      ],
+      "Phytopharma": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 6,
+          "frequency": 1
+        }
+      ],
+      "Alpinamed": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 9,
+          "frequency": 2
+        }
+      ],
+      "Vogel": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 5,
+          "frequency": 2
+        }
+      ],
+      "Sponser": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 8,
+          "frequency": 2
+        }
+      ],
+      "Zur Rose": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 10,
+          "frequency": 1
+        }
+      ],
+      "Pharma Nord": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 6,
+          "frequency": 1
+        }
+      ],
+      "SAN Nutrition": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 7,
+          "frequency": 1
+        }
+      ],
+      "Weleda": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 10,
+          "frequency": 1
         }
       ]
     }

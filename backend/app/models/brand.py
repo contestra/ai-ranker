@@ -18,3 +18,5 @@ class Brand(Base):
     
     # Relationships
     tracked_phrases = relationship("TrackedPhrase", back_populates="brand", cascade="all, delete-orphan")
+    domains = relationship("Domain", back_populates="brand", cascade="all, delete-orphan")
+    bot_events = relationship("BotEvent", back_populates="brand")

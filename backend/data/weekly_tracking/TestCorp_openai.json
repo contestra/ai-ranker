@@ -1,0 +1,386 @@
+{
+  "brand_name": "TestCorp",
+  "vendor": "openai",
+  "entity_tracking": {
+    "quality": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 2,
+        "frequency": 4
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 1,
+        "frequency": 5
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 1,
+        "frequency": 5
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 2,
+        "frequency": 4
+      }
+    ],
+    "innovation": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 3,
+        "frequency": 4
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 3,
+        "frequency": 4
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 3,
+        "frequency": 4
+      }
+    ],
+    "service": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 5,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 3,
+        "frequency": 4
+      }
+    ],
+    "value": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 4,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 5,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 5,
+        "frequency": 3
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 4,
+        "frequency": 3
+      }
+    ],
+    "reliability": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 6,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 7,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 8,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 7,
+        "frequency": 2
+      }
+    ],
+    "technology": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 7,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 6,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 6,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 5,
+        "frequency": 3
+      }
+    ],
+    "performance": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 8,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 8,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 7,
+        "frequency": 2
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 6,
+        "frequency": 2
+      }
+    ],
+    "support": [
+      {
+        "week_start": "2025-07-14",
+        "rank": 9,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-21",
+        "rank": 9,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-07-28",
+        "rank": 9,
+        "frequency": 1
+      },
+      {
+        "week_start": "2025-08-04",
+        "rank": 8,
+        "frequency": 1
+      }
+    ]
+  },
+  "phrase_tracking": {
+    "best in category": {
+      "Market Leader": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 9
+        }
+      ],
+      "Competitor A": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 8
+        }
+      ],
+      "Competitor B": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 7
+        }
+      ],
+      "TestCorp": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 6,
+          "frequency": 4
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 5,
+          "frequency": 5
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 7
+        }
+      ],
+      "Competitor C": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 6
+        }
+      ]
+    },
+    "top rated products": {
+      "TestCorp": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 5,
+          "frequency": 5
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 8
+        }
+      ],
+      "Industry Giant": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 1,
+          "frequency": 9
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 9
+        }
+      ],
+      "Established Brand": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 2,
+          "frequency": 8
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 7
+        }
+      ],
+      "Premium Option": [
+        {
+          "week_start": "2025-07-14",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-21",
+          "rank": 3,
+          "frequency": 7
+        },
+        {
+          "week_start": "2025-07-28",
+          "rank": 4,
+          "frequency": 6
+        },
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 6
+        }
+      ]
+    }
+  }
+}

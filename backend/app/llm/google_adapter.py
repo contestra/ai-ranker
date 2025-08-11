@@ -6,7 +6,7 @@ from app.config import settings
 class GoogleAdapter(LLMAdapter):
     def __init__(self):
         genai.configure(api_key=settings.google_api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-2.5-pro')
         self.embedding_model = 'models/text-embedding-004'
     
     async def generate(

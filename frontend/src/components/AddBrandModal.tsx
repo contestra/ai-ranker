@@ -37,8 +37,7 @@ export default function AddBrandModal({ isOpen, onClose, onBrandAdded }: AddBran
         domain: domain || undefined,
         category: categoryArray,
         aliases: aliasArray,
-        wikidata_qid: null,
-        use_canonical_entities: true
+        wikidata_qid: undefined
       })
 
       // Reset form

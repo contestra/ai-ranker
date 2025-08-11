@@ -212,11 +212,21 @@ async def get_weekly_tracking(brand_name: str, vendor: str):
         phrase_tracking=phrase_tracking
     )
 
+class GenerateSampleRequest(BaseModel):
+    brand_name: str
+    vendor: str = "openai"
+
 @router.post("/weekly-tracking/generate-sample")
-async def generate_sample_data(brand_name: str = "AVEA Life", vendor: str = "openai"):
+async def generate_sample_data(request: GenerateSampleRequest):
     """
     Generate sample weekly tracking data for testing
     """
+    brand_name = request.brand_name
+    vendor = request.vendor
+    
+    if not brand_name:
+        brand_name = "AVEA Life"
+    
     # Generate 4 weeks of sample data
     weeks = []
     current_date = datetime.now()
@@ -231,17 +241,30 @@ async def generate_sample_data(brand_name: str = "AVEA Life", vendor: str = "ope
         "phrase_tracking": {}
     }
     
-    # Sample entities for AVEA Life
-    entities = {
-        "AVEA": [2, 1, 1, 2],  # Ranks over 4 weeks
-        "telecommunications": [3, 4, 3, 3],
-        "longevity": [5, 4, 4, 3],
-        "supplements": [4, 5, 5, 4],
-        "Turkey": [6, 7, 8, 7],
-        "wellness": [7, 6, 6, 5],
-        "anti-aging": [8, 8, 7, 6],
-        "vitamins": [9, 9, 9, 8]
-    }
+    # Generate sample entities based on brand name
+    if "avea" in brand_name.lower():
+        entities = {
+            "longevity": [2, 1, 1, 2],  # Ranks over 4 weeks
+            "supplements": [3, 4, 3, 3],
+            "wellness": [5, 4, 4, 3],
+            "anti-aging": [4, 5, 5, 4],
+            "vitamins": [6, 7, 8, 7],
+            "health": [7, 6, 6, 5],
+            "NMN": [8, 8, 7, 6],
+            "NAD+": [9, 9, 9, 8]
+        }
+    else:
+        # Generic entities for any brand
+        entities = {
+            "quality": [2, 1, 1, 2],
+            "innovation": [3, 4, 3, 3],
+            "service": [5, 4, 4, 3],
+            "value": [4, 5, 5, 4],
+            "reliability": [6, 7, 8, 7],
+            "technology": [7, 6, 6, 5],
+            "performance": [8, 8, 7, 6],
+            "support": [9, 9, 9, 8]
+        }
     
     for entity, ranks in entities.items():
         tracking_data["entity_tracking"][entity] = []
@@ -252,22 +275,40 @@ async def generate_sample_data(brand_name: str = "AVEA Life", vendor: str = "ope
                 "frequency": 5 - rank // 2  # Higher rank = more frequency
             })
     
-    # Sample phrase tracking
-    phrases = {
-        "best longevity supplements": {
-            "Life Extension": [1, 1, 2, 1],
-            "Thorne Research": [2, 3, 1, 2],
-            "NOW Foods": [3, 2, 3, 3],
-            "AVEA Life": [8, 7, 6, 5],  # Your brand improving
-            "Garden of Life": [4, 4, 4, 4]
-        },
-        "Swiss supplements": {
-            "AVEA Life": [5, 4, 3, 2],  # Better performance here
-            "Burgerstein": [1, 1, 1, 1],
-            "A.Vogel": [2, 2, 2, 3],
-            "Biotta": [3, 3, 4, 4]
+    # Sample phrase tracking - use dynamic brand name
+    if "avea" in brand_name.lower():
+        phrases = {
+            "best longevity supplements": {
+                "Life Extension": [1, 1, 2, 1],
+                "Thorne Research": [2, 3, 1, 2],
+                "NOW Foods": [3, 2, 3, 3],
+                brand_name: [8, 7, 6, 5],  # Your brand improving
+                "Garden of Life": [4, 4, 4, 4]
+            },
+            "Swiss supplements": {
+                brand_name: [5, 4, 3, 2],  # Better performance here
+                "Burgerstein": [1, 1, 1, 1],
+                "A.Vogel": [2, 2, 2, 3],
+                "Biotta": [3, 3, 4, 4]
+            }
         }
-    }
+    else:
+        # Generic phrases for any brand
+        phrases = {
+            "best in category": {
+                "Market Leader": [1, 1, 2, 1],
+                "Competitor A": [2, 3, 1, 2],
+                "Competitor B": [3, 2, 3, 3],
+                brand_name: [6, 5, 4, 3],  # Your brand improving
+                "Competitor C": [4, 4, 4, 4]
+            },
+            "top rated products": {
+                brand_name: [5, 4, 3, 2],  # Better performance here
+                "Industry Giant": [1, 1, 1, 1],
+                "Established Brand": [2, 2, 2, 3],
+                "Premium Option": [3, 3, 4, 4]
+            }
+        }
     
     for phrase, brands in phrases.items():
         tracking_data["phrase_tracking"][phrase] = {}

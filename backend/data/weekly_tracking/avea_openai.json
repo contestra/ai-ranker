@@ -1,0 +1,159 @@
+{
+  "brand_name": "avea",
+  "vendor": "openai",
+  "entity_tracking": {
+    "undefined": [
+      {
+        "week_start": "2025-08-04",
+        "rank": 10,
+        "frequency": 1
+      }
+    ]
+  },
+  "phrase_tracking": {
+    "best longevity supplements": {
+      "Life Extension": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 1
+        }
+      ],
+      "Thorne": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 1
+        }
+      ],
+      "Pure Encapsulations": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 1
+        }
+      ],
+      "Jarrow Formulas": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 1
+        }
+      ],
+      "Now Foods": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 5,
+          "frequency": 1
+        }
+      ],
+      "Solgar": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 6,
+          "frequency": 1
+        }
+      ],
+      "Swanson": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 7,
+          "frequency": 1
+        }
+      ],
+      "Garden of Life": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 8,
+          "frequency": 1
+        }
+      ],
+      "Nordic Naturals": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 9,
+          "frequency": 1
+        }
+      ],
+      "Doctor's Best": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 10,
+          "frequency": 1
+        }
+      ]
+    },
+    "best swiss supplements": {
+      "Swisse": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 1,
+          "frequency": 1
+        }
+      ],
+      "Burgerstein": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 2,
+          "frequency": 1
+        }
+      ],
+      "Similasan": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 3,
+          "frequency": 1
+        }
+      ],
+      "BioStrath": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 4,
+          "frequency": 1
+        }
+      ],
+      "Vogel": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 5,
+          "frequency": 1
+        }
+      ],
+      "Pharma Nord": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 6,
+          "frequency": 1
+        }
+      ],
+      "Sponser": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 7,
+          "frequency": 1
+        }
+      ],
+      "Alpinamed": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 8,
+          "frequency": 1
+        }
+      ],
+      "Biotta": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 9,
+          "frequency": 1
+        }
+      ],
+      "Healthspan": [
+        {
+          "week_start": "2025-08-04",
+          "rank": 10,
+          "frequency": 1
+        }
+      ]
+    }
+  }
+}

@@ -4,6 +4,12 @@ import { useState, useEffect } from 'react'
 import AIVisibility from '@/components/AIVisibility'
 import ModelComparison from '@/components/ModelComparison'
 import Settings from '@/components/Settings'
+import ComparisonView from '@/components/ComparisonView'
+import LLMCrawlability from '@/components/LLMCrawlability'
+import WeeklyTrends from '@/components/WeeklyTrends'
+import ConcordanceAnalysis from '@/components/ConcordanceAnalysis'
+import EntityStrengthDashboard from '@/components/EntityStrengthDashboard'
+import CrawlerMonitorV2 from '@/components/CrawlerMonitorV2'
 import TestButton from '@/components/TestButton'
 import { brandsApi } from '@/lib/api'
 
@@ -11,12 +17,18 @@ export default function Home() {
   const [brandInput, setBrandInput] = useState('')
   const [brandName, setBrandName] = useState('')
   const [brandId, setBrandId] = useState<number>(1)
-  const [activeTab, setActiveTab] = useState<'ai-visibility' | 'openai' | 'google' | 'anthropic' | 'settings'>('ai-visibility')
+  const [activeTab, setActiveTab] = useState<'ai-visibility' | 'openai' | 'google' | 'comparison' | 'concordance' | 'entity-strength' | 'crawlability' | 'crawler-monitor' | 'trends' | 'anthropic' | 'settings'>('ai-visibility')
 
   const tabs = [
     { id: 'ai-visibility', label: 'AI Visibility', icon: '👁️' },
     { id: 'openai', label: 'OpenAI', icon: '🤖' },
     { id: 'google', label: 'Google', icon: '🔍' },
+    { id: 'comparison', label: 'Comparison', icon: '🔬' },
+    { id: 'concordance', label: 'Concordance', icon: '🔄' },
+    { id: 'entity-strength', label: 'Entity Strength', icon: '💪' },
+    { id: 'crawlability', label: 'LLM Crawlability', icon: '🕷️' },
+    { id: 'crawler-monitor', label: 'Crawler Monitor', icon: '📡' },
+    { id: 'trends', label: 'Weekly Trends', icon: '📈' },
     // { id: 'anthropic', label: 'Anthropic', icon: '🧠' }, // Disabled - no embeddings API
     { id: 'settings', label: 'Settings', icon: '⚙️' }
   ]
@@ -62,8 +74,7 @@ export default function Home() {
                           domain: '',
                           aliases: [],
                           category: [],
-                          wikidata_qid: null,
-                          use_canonical_entities: true
+                          wikidata_qid: undefined
                         })
                         setBrandId(brand.id)
                         console.log('Brand created/updated:', brand)
@@ -127,7 +138,17 @@ export default function Home() {
 
           {/* Tab Content */}
           <div className="flex-1 overflow-auto bg-gray-50">
-            {brandName ? (
+            {/* LLM Crawlability and Crawler Monitor don't need a brand */}
+            {(activeTab === 'crawlability' || activeTab === 'crawler-monitor') ? (
+              <div className="p-6">
+                {activeTab === 'crawlability' && (
+                  <LLMCrawlability brandId={brandId} brandName={brandName || ''} />
+                )}
+                {activeTab === 'crawler-monitor' && (
+                  <CrawlerMonitorV2 brandId={brandId} brandName={brandName || ''} />
+                )}
+              </div>
+            ) : brandName ? (
               <div className="p-6">
                 {activeTab === 'ai-visibility' && (
                   <AIVisibility brandId={brandId} brandName={brandName} />
@@ -137,6 +158,22 @@ export default function Home() {
                 )}
                 {activeTab === 'google' && (
                   <ModelComparison brandId={brandId} brandName={brandName} vendor="google" />
+                )}
+                {activeTab === 'comparison' && (
+                  <ComparisonView brandId={brandId} brandName={brandName} />
+                )}
+                {activeTab === 'concordance' && (
+                  <ConcordanceAnalysis 
+                    brandName={brandName} 
+                    vendor="openai"
+                    trackedPhrases={JSON.parse(localStorage.getItem('trackedPhrases') || '[]')}
+                  />
+                )}
+                {activeTab === 'entity-strength' && (
+                  <EntityStrengthDashboard brandName={brandName} />
+                )}
+                {activeTab === 'trends' && (
+                  <WeeklyTrends brandId={brandId} brandName={brandName} vendor="openai" />
                 )}
                 {/* Anthropic tab disabled - no embeddings API available for BEEB analysis
                 {activeTab === 'anthropic' && (
@@ -154,6 +191,9 @@ export default function Home() {
                   <p className="text-sm text-gray-400">
                     AI Rank shows what happens when people talk to AI models<br />
                     to find information related to your name, brand, products or services.
+                  </p>
+                  <p className="text-xs text-gray-400 mt-4">
+                    Note: LLM Crawlability checker and Crawler Monitor are available without entering a brand
                   </p>
                 </div>
               </div>

@@ -1,0 +1,205 @@
+{
+  "bots": {
+    "openai": {
+      "search": {
+        "name": "OAI-SearchBot",
+        "ua_pattern": "OAI-SearchBot",
+        "type": "indexing",
+        "purpose": "ChatGPT Search indexing",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://platform.openai.com/docs/bots"
+        },
+        "robots_token": "OAI-SearchBot"
+      },
+      "chat_user": {
+        "name": "ChatGPT-User",
+        "ua_pattern": "ChatGPT-User",
+        "type": "on_demand",
+        "purpose": "User-initiated retrieval during ChatGPT conversations",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://platform.openai.com/docs/bots"
+        },
+        "robots_token": "ChatGPT-User"
+      },
+      "gptbot": {
+        "name": "GPTBot",
+        "ua_pattern": "GPTBot",
+        "type": "training",
+        "purpose": "Training data collection",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://platform.openai.com/docs/gptbot"
+        },
+        "robots_token": "GPTBot"
+      }
+    },
+    "perplexity": {
+      "bot": {
+        "name": "PerplexityBot",
+        "ua_pattern": "PerplexityBot",
+        "type": "indexing",
+        "purpose": "Search indexing",
+        "verification": {
+          "method": "ip_json",
+          "source": "https://www.perplexity.ai/perplexitybot.json"
+        },
+        "robots_token": "PerplexityBot"
+      },
+      "user": {
+        "name": "Perplexity-User",
+        "ua_pattern": "Perplexity-User",
+        "type": "on_demand",
+        "purpose": "User-initiated retrieval during searches",
+        "verification": {
+          "method": "ip_json",
+          "source": "https://www.perplexity.ai/perplexitybot.json"
+        },
+        "robots_token": "Perplexity-User"
+      }
+    },
+    "anthropic": {
+      "claudebot": {
+        "name": "ClaudeBot",
+        "ua_pattern": "ClaudeBot",
+        "type": "training",
+        "purpose": "Training and indexing",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://support.anthropic.com"
+        },
+        "robots_token": "ClaudeBot"
+      },
+      "claude_user": {
+        "name": "Claude-User",
+        "ua_pattern": "Claude-User|anthropic-ai",
+        "type": "on_demand",
+        "purpose": "User-initiated retrieval during Claude conversations",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://support.anthropic.com"
+        },
+        "robots_token": "Claude-User"
+      }
+    },
+    "meta": {
+      "external_agent": {
+        "name": "Meta-ExternalAgent",
+        "ua_pattern": "meta-externalagent",
+        "type": "indexing",
+        "purpose": "Meta AI indexing",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://developers.facebook.com/docs/sharing/webmasters/crawler"
+        },
+        "robots_token": "meta-externalagent"
+      },
+      "external_fetcher": {
+        "name": "Meta-ExternalFetcher",
+        "ua_pattern": "meta-externalfetcher",
+        "type": "on_demand",
+        "purpose": "Meta AI content fetching",
+        "verification": {
+          "method": "ip_range",
+          "source": "https://developers.facebook.com/docs/sharing/webmasters/crawler"
+        },
+        "robots_token": "meta-externalfetcher"
+      }
+    },
+    "google": {
+      "googlebot": {
+        "name": "Googlebot",
+        "ua_pattern": "Googlebot",
+        "type": "indexing",
+        "purpose": "Foundation crawl for AI Overviews",
+        "verification": {
+          "method": "reverse_dns",
+          "domain": "googlebot.com"
+        },
+        "robots_token": "Googlebot"
+      },
+      "google_extended": {
+        "name": "Google-Extended",
+        "ua_pattern": "Google-Extended",
+        "type": "training",
+        "purpose": "Bard/Gemini training",
+        "verification": {
+          "method": "reverse_dns",
+          "domain": "google.com"
+        },
+        "robots_token": "Google-Extended"
+      }
+    },
+    "microsoft": {
+      "bingbot": {
+        "name": "Bingbot",
+        "ua_pattern": "bingbot",
+        "type": "indexing",
+        "purpose": "Bing/Copilot indexing",
+        "verification": {
+          "method": "reverse_dns",
+          "domain": "search.msn.com"
+        },
+        "robots_token": "bingbot"
+      }
+    },
+    "cohere": {
+      "coherebot": {
+        "name": "CohereBot",
+        "ua_pattern": "cohere-ai",
+        "type": "training",
+        "purpose": "Cohere model training",
+        "verification": {
+          "method": "none"
+        },
+        "robots_token": "cohere-ai"
+      }
+    },
+    "youbot": {
+      "bot": {
+        "name": "YouBot",
+        "ua_pattern": "YouBot",
+        "type": "indexing",
+        "purpose": "You.com search",
+        "verification": {
+          "method": "none"
+        },
+        "robots_token": "YouBot"
+      }
+    }
+  },
+  "ip_ranges": {
+    "openai": [
+      "20.15.240.64/28",
+      "20.15.240.80/28",
+      "20.15.240.96/28",
+      "20.15.240.176/28",
+      "20.15.241.0/28",
+      "20.15.242.128/28",
+      "20.15.242.144/28",
+      "20.15.242.192/28",
+      "40.83.2.64/28",
+      "52.230.152.0/24",
+      "52.233.106.0/24"
+    ],
+    "perplexity": "https://www.perplexity.ai/perplexitybot.json",
+    "cloudflare": [
+      "173.245.48.0/20",
+      "103.21.244.0/22",
+      "103.22.200.0/22",
+      "103.31.4.0/22",
+      "141.101.64.0/18",
+      "108.162.192.0/18",
+      "190.93.240.0/20",
+      "188.114.96.0/20",
+      "197.234.240.0/22",
+      "198.41.128.0/17",
+      "162.158.0.0/15",
+      "104.16.0.0/13",
+      "104.24.0.0/14",
+      "172.64.0.0/13",
+      "131.0.72.0/22"
+    ]
+  }
+}

@@ -20,12 +20,12 @@ class LangChainAdapter:
         
         self.models = {
             "openai": ChatOpenAI(
-                model="gpt-4-turbo-preview",  # Use a working model
-                temperature=0.7,
+                model="gpt-5",  # GPT-5 - the only model now
+                temperature=1.0,  # GPT-5 only supports default temperature
                 api_key=settings.openai_api_key
             ),
             "google": ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-pro",
                 temperature=0.1,
                 google_api_key=settings.google_api_key
             ),

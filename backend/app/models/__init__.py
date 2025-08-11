@@ -14,10 +14,13 @@ from .tracked_phrase import (
     TrackedPhrase, WeeklyMetric, PhraseResult, 
     ThresholdResult, PivotAnalysis
 )
+from .domain import Domain, BotEvent
+from .bot_stats import DailyBotStats, WeeklyBotTrends, BotProvider
 
 __all__ = [
     'Brand', 'Concept', 'Model', 'Experiment', 'Run',
     'Prompt', 'Completion', 'Entity', 'Mention', 'Metric',
     'Threshold', 'Pivot', 'TrackedPhrase', 'WeeklyMetric',
-    'PhraseResult', 'ThresholdResult', 'PivotAnalysis'
+    'PhraseResult', 'ThresholdResult', 'PivotAnalysis',
+    'Domain', 'BotEvent', 'DailyBotStats', 'WeeklyBotTrends', 'BotProvider'
 ]

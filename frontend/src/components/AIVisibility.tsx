@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { dashboardApi } from '@/lib/api'
+import BrandEntityStrength from './BrandEntityStrength'
 
 interface AIVisibilityProps {
   brandId: number
@@ -28,6 +29,7 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
   const [loading, setLoading] = useState(false)
   const [hasRealData, setHasRealData] = useState(false)
   const [trackedPhrases, setTrackedPhrases] = useState<string[]>([])
+  const [analysisMethod, setAnalysisMethod] = useState<string>('')
 
   useEffect(() => {
     const loadData = () => {
@@ -47,11 +49,48 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
       if (analysisData) {
         const data = JSON.parse(analysisData)
         console.log('Parsed analysis data:', data)
+        
+        // Set method if available
+        if (data.method) {
+          setAnalysisMethod(data.method)
+        }
+        
         if (data.entities && data.entities.length > 0) {
           setTopEntities(data.entities)
           setHasRealData(true)
         }
-        if (data.brands && data.brands.length > 0) {
+        
+        // Check for brand_associations first (Contestra V2 format)
+        if (data.brand_associations && data.brand_associations.length > 0) {
+          // Handle Contestra V2 brand associations
+          // Aggregate brands from multiple phrases
+          console.log('Processing brand associations:', data.brand_associations.length)
+          const brandMap: Record<string, {count: number, positions: number[]}> = {}
+          
+          data.brand_associations.forEach((assoc: any) => {
+            const brand = assoc.brand
+            if (!brandMap[brand]) {
+              brandMap[brand] = { count: 0, positions: [] }
+            }
+            brandMap[brand].count++
+            brandMap[brand].positions.push(assoc.position)
+          })
+          
+          // Convert to array and calculate scores
+          const brands = Object.entries(brandMap).map(([brand, stats]) => ({
+            brand,
+            frequency: stats.count,
+            avg_position: stats.positions.reduce((a, b) => a + b, 0) / stats.positions.length,
+            weighted_score: (10 - (stats.positions.reduce((a, b) => a + b, 0) / stats.positions.length) + 1) / 10
+          }))
+          
+          // Sort by weighted score
+          brands.sort((a, b) => b.weighted_score - a.weighted_score)
+          
+          setTopBrands(brands)
+          setHasRealData(true)
+        } else if (data.brands && data.brands.length > 0) {
+          // Fallback to old format if no brand_associations
           setTopBrands(data.brands)
           setHasRealData(true)
         }
@@ -176,6 +215,19 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
         <p className="text-gray-600">
           AI Rank shows what happens when people talk to AI models to find information related to your name, brand, products or services.
         </p>
+        {analysisMethod === 'contestra_v2' && (
+          <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+            <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            Contestra V2 Method (Prompted Lists with Rank Aggregation)
+          </div>
+        )}
+      </div>
+
+      {/* Brand Entity Strength Indicator */}
+      <div className="mb-6">
+        <BrandEntityStrength brandName={brandName} vendor="openai" />
       </div>
 
       {/* Show notice if no data */}
@@ -196,10 +248,10 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
                 <ol className="list-decimal list-inside mt-2">
                   <li>Go to the Settings tab</li>
                   <li>Add tracked phrases for your market</li>
-                  <li>Click <strong>"Run Vector Analysis (BEEB)"</strong> to calculate embedding similarities</li>
+                  <li>Click <strong>"Run Contestra V2 Analysis"</strong> to calculate brand associations</li>
                 </ol>
                 <p className="mt-2">
-                  BEEB analysis uses vector embeddings to measure semantic similarity between your brand and key entities/competitors.
+                  Contestra V2 analysis uses prompted lists with rank aggregation to measure AI brand associations.
                 </p>
               </div>
             </div>
@@ -218,16 +270,16 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Entity
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Frequency
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Freq
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Avg Position
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avg Pos
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Weight
                   </th>
                 </tr>
@@ -235,16 +287,16 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
               <tbody className="bg-white divide-y divide-gray-200">
                 {topEntities.map((entity, index) => (
                   <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {entity.entity}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
                       {entity.frequency}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {entity.avg_position?.toFixed(2) || '-'}
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                      {entity.avg_position?.toFixed(1) || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
@@ -275,16 +327,16 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Brand
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Frequency
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Freq
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Avg Position
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Avg Pos
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Weight
                   </th>
                 </tr>
@@ -299,7 +351,7 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
                         : ''
                     }`}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                       {brand.brand}
                       {brand.brand.toLowerCase() === brandName.toLowerCase() && (
                         <span className="ml-2 text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">
@@ -307,13 +359,13 @@ export default function AIVisibility({ brandId, brandName }: AIVisibilityProps) 
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
                       {brand.frequency}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {brand.avg_position?.toFixed(2) || '-'}
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
+                      {brand.avg_position?.toFixed(1) || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
