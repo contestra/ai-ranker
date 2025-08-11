@@ -44,7 +44,9 @@
       "Bash(git add:*)",
       "Bash(git push:*)",
       "Bash(git remote add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm search:*)",
+      "Bash(claude-code mcp:*)"
     ],
     "deny": []
   }

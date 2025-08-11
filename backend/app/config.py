@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     langchain_tracing_v2: bool = True
     langchain_project: str = "ai-ranker"
     
+    fly_api_token: Optional[str] = None  # Added for Fly.io deployment
+    
     host: str = "0.0.0.0"
     port: int = 8000
     environment: str = "development"

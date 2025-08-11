@@ -114,6 +114,12 @@ export default function Home() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
+          {/* Page Title */}
+          <div className="bg-white border-b px-8 py-4">
+            <h1 className="text-3xl font-bold text-gray-900">Own the First Answer™ - AI Suite</h1>
+            <p className="text-sm text-gray-600 mt-1">Measure and optimize your brand's AI visibility across models</p>
+          </div>
+          
           {/* Tab Navigation */}
           <div className="bg-white shadow">
             <div className="px-6">

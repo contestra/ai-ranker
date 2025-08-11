@@ -1,0 +1,11 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+sqlalchemy==2.0.32
+psycopg2-binary==2.9.9
+alembic==1.13.2
+pydantic==2.8.2
+pydantic-settings==2.4.0
+redis==5.0.7
+rq==1.16.2
+python-dateutil==2.9.0.post0
+APScheduler==3.10.4

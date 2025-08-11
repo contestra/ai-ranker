@@ -7,8 +7,15 @@ interface EntityClassification {
   label: 'KNOWN_STRONG' | 'KNOWN_WEAK' | 'UNKNOWN' | 'EMPTY' | 'HALLUCINATED'
   confidence: number
   reasoning?: string
+  response_text?: string  // The AI's natural language response about the brand
   specific_claims: string[]
   generic_claims: string[]
+  confusion_detected?: boolean
+  confusion_type?: string
+  ai_thinks_industry?: string
+  actual_industry?: string
+  disambiguation_needed?: boolean
+  other_entities_list?: string[]
 }
 
 interface BrandStrengthResult {
@@ -26,36 +33,72 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
   const [primaryBrand, setPrimaryBrand] = useState<EntityClassification | null>(null)
   const [competitors, setCompetitors] = useState<BrandStrengthResult[]>([])
   const [customBrands, setCustomBrands] = useState<string>('')
+  const [brandDomain, setBrandDomain] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [batchLoading, setBatchLoading] = useState(false)
-  const [vendor, setVendor] = useState('openai')
+  const [vendor, setVendor] = useState('google')  // Default to Google Gemini as GPT models return empty
+  const [duplicateWarning, setDuplicateWarning] = useState<string>('')
 
-  // Check primary brand on mount
-  useEffect(() => {
-    if (brandName) {
-      checkBrandStrength(brandName)
-    }
-  }, [brandName])
+  // Don't automatically check on mount - wait for user to click button
+  // useEffect(() => {
+  //   if (brandName) {
+  //     checkBrandStrength(brandName)
+  //   }
+  // }, [brandName])
 
   const checkBrandStrength = async (brand: string) => {
     setLoading(true)
     try {
+      // Create an AbortController for timeout
+      const controller = new AbortController()
+      // Set timeout to 120 seconds for GPT-5 (which is slow)
+      const timeoutId = setTimeout(() => controller.abort(), 120000)
+      
       const response = await fetch('http://localhost:8000/api/brand-entity-strength', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           brand_name: brand,
+          domain: brandDomain || undefined,
           vendor: vendor,
           include_reasoning: true
-        })
+        }),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
 
       if (response.ok) {
         const data = await response.json()
-        setPrimaryBrand(data.classification)
+        console.log('API Response received:', data)
+        console.log('Classification object:', data.classification)
+        console.log('Raw response exists?', !!data.raw_response)
+        console.log('Specific claims count:', data.classification?.specific_claims?.length || 0)
+        
+        if (data && data.classification) {
+          console.log('Setting primary brand with:', data.classification)
+          // Force a state reset first to ensure re-render
+          setPrimaryBrand(null)
+          setTimeout(() => {
+            setPrimaryBrand(data.classification)
+            console.log('State update triggered with delay')
+          }, 10)
+        } else {
+          console.error('Invalid response structure:', data)
+          alert('Invalid response structure from API')
+        }
+      } else {
+        const errorText = await response.text()
+        console.error('API Error:', response.status, errorText)
+        alert(`Error: ${response.status} - ${errorText}`)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking brand strength:', error)
+      if (error.name === 'AbortError') {
+        alert('Request timed out after 2 minutes. GPT-5 is very slow - please try again or use Google (Gemini) for faster results.')
+      } else {
+        alert(`Network error: ${error.message || error}`)
+      }
     }
     setLoading(false)
   }
@@ -63,22 +106,52 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
   const checkCompetitors = async () => {
     if (!customBrands.trim()) return
 
-    setBatchLoading(true)
+    setDuplicateWarning('') // Clear any previous warnings
+    
     const brands = customBrands.split(',').map(b => b.trim()).filter(b => b)
+    
+    // Check for duplicates before making API call
+    const existingBrands = new Set(competitors.map(c => c.brand.toLowerCase()))
+    // Also check against the primary brand
+    if (brandName) {
+      existingBrands.add(brandName.toLowerCase())
+    }
+    
+    const duplicates = brands.filter(b => existingBrands.has(b.toLowerCase()))
+    const newBrands = brands.filter(b => !existingBrands.has(b.toLowerCase()))
+    
+    if (duplicates.length > 0) {
+      setDuplicateWarning(`Already in list: ${duplicates.join(', ')}`)
+      
+      // If all brands are duplicates, don't make API call
+      if (newBrands.length === 0) {
+        return
+      }
+      
+      // Update input to only show new brands
+      setCustomBrands(newBrands.join(', '))
+      return
+    }
+
+    setBatchLoading(true)
     
     try {
       const response = await fetch('http://localhost:8000/api/brand-entity-strength/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          brands: brands,
+          brands: newBrands,
           vendor: vendor
         })
       })
 
       if (response.ok) {
         const data = await response.json()
-        setCompetitors(data.results)
+        // Append new results to existing competitors
+        setCompetitors(prev => [...prev, ...data.results])
+        // Clear the input field after successful addition
+        setCustomBrands('')
+        setDuplicateWarning('')
       }
     } catch (error) {
       console.error('Error checking competitors:', error)
@@ -157,22 +230,48 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
           onChange={(e) => setVendor(e.target.value)}
           className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         >
-          <option value="openai">OpenAI (GPT-5)</option>
-          <option value="google">Google (Gemini 2.5 Pro)</option>
+          <option value="google">Google (Gemini 2.5 Pro) - Recommended</option>
+          <option value="openai">OpenAI (GPT-4o) - Currently Broken</option>
         </select>
       </div>
 
       {/* Primary Brand Analysis */}
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Your Brand: {brandName}</h3>
-          <button
-            onClick={() => checkBrandStrength(brandName)}
-            className="text-sm text-indigo-600 hover:text-indigo-700"
-            disabled={loading}
-          >
-            {loading ? 'Checking...' : 'Re-check'}
-          </button>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Your Brand: {brandName}</h3>
+          
+          {/* Domain input field */}
+          <div className="flex items-center space-x-3 mb-3">
+            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              Your Website:
+            </label>
+            <input
+              type="text"
+              value={brandDomain}
+              onChange={(e) => {
+                // Clean the domain - remove https://, http://, trailing slashes
+                let domain = e.target.value.trim()
+                domain = domain.replace(/^https?:\/\//, '') // Remove http:// or https://
+                domain = domain.replace(/\/$/, '') // Remove trailing slash
+                setBrandDomain(domain)
+              }}
+              placeholder="example.com or www.example.com"
+              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+            <button
+              onClick={() => checkBrandStrength(brandName)}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50"
+              disabled={loading || !brandName}
+            >
+              {loading ? 'Checking...' : 'Check Strength'}
+            </button>
+          </div>
+          <div className="text-xs text-gray-500 mb-2">
+            <p>• Enter domain without https:// (e.g., "avea-life.com" or "www.avea-life.com")</p>
+            {brandDomain && (
+              <p>• We'll verify the AI is talking about YOUR {brandName}, not another company with the same name</p>
+            )}
+          </div>
         </div>
 
         {primaryBrand && (
@@ -217,8 +316,89 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
             </div>
 
             {primaryBrand.reasoning && (
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className={`rounded-lg p-4 ${
+                primaryBrand.reasoning.toLowerCase().includes('wrong') || 
+                primaryBrand.reasoning.toLowerCase().includes('confusion') ||
+                primaryBrand.reasoning.toLowerCase().includes('different') ||
+                primaryBrand.reasoning.toLowerCase().includes('but actual brand') ?
+                'bg-amber-50 border border-amber-200' : 'bg-gray-50'
+              }`}>
+                {(primaryBrand.reasoning.toLowerCase().includes('wrong') || 
+                  primaryBrand.reasoning.toLowerCase().includes('but actual brand')) && (
+                  <div className="flex items-start mb-2">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 mr-2 mt-0.5" />
+                    <h4 className="text-sm font-semibold text-amber-900">Entity Confusion Detected</h4>
+                  </div>
+                )}
                 <p className="text-sm text-gray-700">{primaryBrand.reasoning}</p>
+              </div>
+            )}
+
+            {/* Show disambiguation warning if multiple entities share the name */}
+            {primaryBrand.disambiguation_needed && primaryBrand.other_entities_list && primaryBrand.other_entities_list.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start mb-3">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-amber-600 mr-2" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-amber-900 mb-1">
+                      Brand Name Conflict - Multiple Entities Share This Name
+                    </h4>
+                    <p className="text-sm text-amber-800 mb-2">
+                      AI identified {primaryBrand.other_entities_list.length} different entities named "{brandName}"
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-50 rounded p-3 mb-3">
+                  <h5 className="text-xs font-semibold text-amber-900 mb-2 uppercase">Other Entities With Same Name:</h5>
+                  <ul className="text-sm text-amber-700 space-y-1">
+                    {primaryBrand.other_entities_list.slice(0, 5).map((entity, idx) => (
+                      <li key={idx}>• {entity}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="bg-white bg-opacity-50 rounded p-3">
+                  <h5 className="text-xs font-semibold text-amber-900 mb-2 uppercase">Impact on Your Brand:</h5>
+                  <ul className="text-sm text-amber-700 space-y-1">
+                    <li>• Your brand lacks unique recognition in AI systems</li>
+                    <li>• Users must provide additional context to find your company</li>
+                    <li>• AI may provide information about the wrong entity</li>
+                    <li>• Brand strength is significantly weakened by name confusion</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* Show confusion details if detected */}
+            {primaryBrand.confusion_detected && !primaryBrand.disambiguation_needed && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start mb-3">
+                  <ExclamationTriangleIcon className="h-6 w-6 text-red-600 mr-2" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-red-900 mb-1">
+                      Entity Confusion Detected - AI is Identifying Wrong Company
+                    </h4>
+                    {primaryBrand.ai_thinks_industry && primaryBrand.actual_industry && (
+                      <p className="text-sm text-red-800 mb-2">
+                        AI thinks your brand is in <strong>{primaryBrand.ai_thinks_industry}</strong>, 
+                        but you actually operate in <strong>{primaryBrand.actual_industry}</strong>
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-50 rounded p-3 mb-3">
+                  <h5 className="text-xs font-semibold text-red-900 mb-2 uppercase">Impact on Your Brand:</h5>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    <li>• AI assistants will provide wrong information about your company</li>
+                    <li>• Potential customers won't find your actual products/services</li>
+                    <li>• Your brand's AI visibility score is effectively zero</li>
+                    <li>• Competitors with clear AI recognition have a major advantage</li>
+                  </ul>
+                </div>
+                {primaryBrand.confusion_type === 'mixed_entities' && (
+                  <p className="text-xs text-red-600 italic">
+                    Note: The AI appears to be mixing multiple companies with similar names.
+                  </p>
+                )}
               </div>
             )}
 
@@ -226,7 +406,11 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
             <div className="grid grid-cols-2 gap-4">
               {primaryBrand.specific_claims.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Specific Knowledge</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">
+                    {primaryBrand.reasoning && primaryBrand.reasoning.toLowerCase().includes('but actual brand') 
+                      ? "What AI Thinks (WRONG)" 
+                      : "Specific Knowledge"}
+                  </h4>
                   <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
                     {primaryBrand.specific_claims.slice(0, 3).map((claim, idx) => (
                       <li key={idx}>{claim}</li>
@@ -262,7 +446,10 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
               <input
                 type="text"
                 value={customBrands}
-                onChange={(e) => setCustomBrands(e.target.value)}
+                onChange={(e) => {
+                  setCustomBrands(e.target.value)
+                  setDuplicateWarning('') // Clear warning when user types
+                }}
                 placeholder="e.g., OpenAI, Google, Microsoft, Meta"
                 className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               />
@@ -274,7 +461,24 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
                 {batchLoading ? 'Checking...' : 'Check Strength'}
               </button>
             </div>
+            {duplicateWarning && (
+              <p className="mt-2 text-sm text-amber-600">
+                ⚠️ {duplicateWarning}
+              </p>
+            )}
           </div>
+
+          {/* Clear button when competitors exist */}
+          {competitors.length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => setCompetitors([])}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Clear all competitors
+              </button>
+            </div>
+          )}
 
           {/* Results Table */}
           {competitors.length > 0 && (
@@ -362,6 +566,58 @@ export default function EntityStrengthDashboard({ brandName }: EntityStrengthDas
           )}
         </div>
       </div>
+
+      {/* Raw AI Response */}
+      {primaryBrand && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <h4 className="text-sm font-medium text-gray-900 mb-3">AI Model Response</h4>
+          
+          {/* Show the AI's actual response text if available */}
+          {primaryBrand.response_text && (
+            <div className="mb-4 p-3 bg-white rounded-lg border border-gray-300">
+              <h5 className="text-xs font-semibold text-gray-700 mb-2 uppercase">What the AI Said:</h5>
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">{primaryBrand.response_text}</p>
+            </div>
+          )}
+          
+          <div className="space-y-2 text-sm">
+            <div>
+              <span className="font-medium text-gray-700">Classification:</span>{' '}
+              <span className="text-gray-900">{primaryBrand.label}</span>
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Confidence:</span>{' '}
+              <span className="text-gray-900">{primaryBrand.confidence}%</span>
+            </div>
+            {primaryBrand.reasoning && (
+              <div>
+                <span className="font-medium text-gray-700">System Analysis:</span>{' '}
+                <span className="text-gray-900">{primaryBrand.reasoning}</span>
+              </div>
+            )}
+            {primaryBrand.disambiguation_needed && (
+              <div>
+                <span className="font-medium text-gray-700">Disambiguation Required:</span>{' '}
+                <span className="text-orange-600">Yes - Multiple entities share this name</span>
+              </div>
+            )}
+            {primaryBrand.confusion_detected && (
+              <div>
+                <span className="font-medium text-gray-700">Confusion Type:</span>{' '}
+                <span className="text-red-600">{primaryBrand.confusion_type || 'Entity mismatch detected'}</span>
+              </div>
+            )}
+            <details className="mt-3">
+              <summary className="cursor-pointer text-gray-600 hover:text-gray-900">
+                View Full JSON Response
+              </summary>
+              <pre className="mt-2 p-3 bg-white rounded border border-gray-300 text-xs overflow-x-auto">
+                {JSON.stringify(primaryBrand, null, 2)}
+              </pre>
+            </details>
+          </div>
+        </div>
+      )}
 
       {/* Insights */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

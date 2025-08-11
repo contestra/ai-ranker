@@ -1,0 +1,32 @@
+You are a principal backend/infra engineer. Produce a production‑grade technical plan and scaffolding for a "Prompt Tracking System" that powers brand visibility checks across frontier LLMs. Runtime: Python 3.11, FastAPI, SQLAlchemy + Alembic, Postgres 15+, Redis 7 (Fly.io), LangChain optional, RQ for workers, APScheduler for periodic runs. Deploy target: Fly.io (API, worker, scheduler, Postgres, Redis). Multi‑tenant SaaS.
+
+Goal
+Clients configure brand name + variations, website URL, and prompts (suggested + custom). For each prompt select up to six countries (US, GB, AE, DE, CH, SG); select one or more frontier models (OpenAI GPT‑5, Google Gemini 2.5, Anthropic Claude, Perplexity); choose language (default en‑US); choose Grounding mode **per model**: NONE (ungrounded) or WEB (web‑grounded via provider native mode or our retriever). For each (prompt × country × model × language × grounding_mode) fire via geo proxy (if applicable), store config + answer with ISO timestamps, support daily/weekly/monthly schedules and ad‑hoc runs. Max 200 prompts/tenant. Soft deletes + auditability.
+
+Important
+- Canonicalization: optional roll‑up of brand variations to a canonical brand with historical snapshot on runs.
+- Grounding modes: **ONLY NONE or WEB** (no SITE). WEB may use provider web mode or our web retriever; record citations.
+- Prompt caching: never cache scheduled answers; cache suggestions; dedupe runs via Redis idempotency.
+- Soft delete via deleted_at. RLS everywhere.
+- UAE = AE country; no city field.
+
+Deliverables
+1) Architecture diagram + narrative (API, worker, scheduler, Postgres w/ RLS, Redis, proxy abstraction, model adapters, optional LangChain chains, OTel + Sentry).
+2) Postgres schema (DDL): tenants, users, brands, brand_variations, brand_canonicalization_map, models, prompts, prompt_countries, prompt_models (with grounding_mode & policy), schedules, runs, answers. Enums: run_status; grounding_mode (NONE|WEB); prompt_category; schedule_cadence. Indexes (partial on deleted_at), uniqueness, prompt cap (200/tenant) trigger. RLS policies.
+3) Country/language handling: US, GB, AE, DE, CH, SG; default en‑US; proxies by country_code; set location_effective=false when provider ignores geo.
+4) Grounding design: per prompt×model store grounding_mode (NONE|WEB) and grounding_policy JSON. Execution: if WEB, run web retrieval (provider native or custom) with proxy, build citations, compose prompt with inline [n] markers. Persist citations and counts.
+5) API (OpenAPI outline): brands (create, variations, canonicalization toggle), prompts (CRUD soft‑delete, countries upsert (≤6), models upsert with grounding_mode/policy), schedules (create/delete, run‑now), runs (ad‑hoc run; list/filter; get by id), answers (get by run_id). Idempotency header on POSTs.
+6) Scheduling & execution: APScheduler enqueues RQ jobs at tenant local time; deterministic idempotency hash over (tenant_id,prompt_id,model_id,country_code,language,grounding_mode,scheduled_ts or now‑minute). Provider limits via Redis buckets; retries w/ backoff; failure codes.
+7) Model routing: provider‑agnostic registry + adapters; capabilities flags (supports_geo, supports_web_search, returns_citations, max_tokens). Record raw meta + token usage.
+8) Proxy abstraction: select by country_code; health/failover; fallback policy or fail_fast per tenant.
+9) Prompt suggestion pipeline: optional heuristics to generate 20 prompts across TOFU/MOFU/BOFU; editable and persisted.
+10) Caching & consistency: Redis keys for suggestions and run_dedupe:idempotency_key (TTL 15m). Never cache scheduled answers.
+11) Storage & linkage: runs store config snapshot including grounding_mode/policy; answers store text + citations + grounding_mode; maintain content_hash for drift; optional pgvector.
+12) Soft delete semantics: do not cascade to runs/answers.
+13) UX: editor with countries (cap 6), models table with Grounded toggle (NONE/WEB) and policy JSON. Results show badge “Ungrounded” vs “Web‑grounded” + citation count. Diff view for drift.
+14) Edge cases: invalid language → en‑US; proxy outage; provider 429; model disabled; large outputs capped; budget caps stop scheduling; DST handling in scheduler.
+15) Security & tenancy: RLS examples; secrets via Fly.io; audit on schedule/run mutations; export rate limiting.
+16) Migrations & examples: Alembic snippets; enums; example queries (expansion counts, latest answer per prompt/model/country). 
+17) Code scaffolding: FastAPI routers, worker job, adapters stubs, prompt composition helper, grounding (WEB only stub). 
+18) Observability: metrics (runs_started/succeeded/failed, p95 latency, grounded ratio, citation_count), traces (web retrieval, model call). 
+19) Deploy on Fly.io: separate Machines for web/worker/scheduler; health checks; secrets; scaling notes.

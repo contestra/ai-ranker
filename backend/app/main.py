@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api import experiments, prompts, entities, metrics, dashboard, tracked_phrases, simple_analysis, real_analysis, embedding_analysis, comprehensive_analysis, pure_beeb, weekly_tracking, entity_extraction_beeb, contestra_v2_analysis, llm_crawlability, concordance_analysis, hybrid_analysis, brand_entity_strength, crawler_monitor, domains, crawler_monitor_v2, bot_analytics
+from app.api import experiments, prompts, entities, metrics, dashboard, tracked_phrases, simple_analysis, real_analysis, embedding_analysis, comprehensive_analysis, pure_beeb, weekly_tracking, entity_extraction_beeb, contestra_v2_analysis, llm_crawlability, concordance_analysis, hybrid_analysis, brand_entity_strength, brand_entity_strength_v2, crawler_monitor, domains, crawler_monitor_v2, bot_analytics
 from app.database import engine, Base
 
 @asynccontextmanager
@@ -42,6 +42,7 @@ app.include_router(llm_crawlability.router, prefix="/api", tags=["crawlability"]
 app.include_router(concordance_analysis.router, prefix="/api", tags=["concordance"])
 app.include_router(hybrid_analysis.router, prefix="/api", tags=["hybrid"])
 app.include_router(brand_entity_strength.router, prefix="/api", tags=["entity_strength"])
+app.include_router(brand_entity_strength_v2.router, prefix="/api", tags=["entity_strength_v2"])
 app.include_router(crawler_monitor.router, prefix="/api/crawler", tags=["crawler_monitor"])
 app.include_router(domains.router, prefix="/api/domains", tags=["domains"])
 app.include_router(crawler_monitor_v2.router, prefix="/api/crawler/v2", tags=["crawler_v2"])

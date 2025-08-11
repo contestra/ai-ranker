@@ -20,8 +20,8 @@ class LangChainAdapter:
         
         self.models = {
             "openai": ChatOpenAI(
-                model="gpt-5",  # GPT-5 - the only model now
-                temperature=1.0,  # GPT-5 only supports default temperature
+                model="gpt-4o",  # Using GPT-4o as all GPT-5 models return empty responses
+                temperature=0.3,  # Lower temperature for more consistent results
                 api_key=settings.openai_api_key
             ),
             "google": ChatGoogleGenerativeAI(
@@ -65,8 +65,9 @@ class LangChainAdapter:
         if vendor != "openai":
             model.temperature = temperature
         
-        # Only set max_tokens for models that support it
+        # Set max_tokens appropriately for each vendor
         if vendor != "google":
+            # GPT-4 and other models use max_tokens
             model.max_tokens = max_tokens
         
         messages = []
@@ -86,10 +87,16 @@ class LangChainAdapter:
             config={"callbacks": self.callbacks}
         )
         
+        # Debug logging for GPT-5 (disabled due to Windows encoding issues)
+        # if vendor == "openai":
+        #     print(f"DEBUG GPT-5 response type: {type(response)}")
+        #     print(f"DEBUG GPT-5 response content: {response.content if hasattr(response, 'content') else 'NO CONTENT ATTR'}")
+        #     print(f"DEBUG GPT-5 response metadata: {response.response_metadata if hasattr(response, 'response_metadata') else 'NO METADATA'}")
+        
         return {
-            "text": response.content,
-            "tokens": response.response_metadata.get("token_usage", {}).get("total_tokens"),
-            "raw": response.response_metadata
+            "text": response.content if hasattr(response, 'content') else str(response),
+            "tokens": response.response_metadata.get("token_usage", {}).get("total_tokens") if hasattr(response, 'response_metadata') else None,
+            "raw": response.response_metadata if hasattr(response, 'response_metadata') else {}
         }
     
     async def generate_stream(

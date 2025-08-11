@@ -1,0 +1,22 @@
+{
+    "classification": "OK_STRONG",
+    "confidence": 85,
+    "reasoning": "I have concrete, verifiable facts about the Turkish mobile operator Avea and can summarize it accurately. The name is shared by other companies, which I know only at a high level.",
+    "specific_claims": [
+        "Avea İletişim Hizmetleri A.Ş. was a Turkish mobile network operator formed in 2004 by the merger of Aria and Aycell.",
+        "Avea became part of Türk Telekom and the Avea brand was retired in 2016 when Türk Telekom unified its fixed, broadband, and mobile services under the Türk Telekom brand.",
+        "Avea operated in Turkey and was the country’s third-largest mobile operator (alongside Turkcell and Vodafone/Telsim).",
+        "Avea provided GSM and 3G mobile services in Turkey."
+    ],
+    "generic_claims": [
+        "As part of Türk Telekom, corporate headquarters are in Ankara, while Avea historically operated nationwide with major offices in Turkey’s large cities.",
+        "There is a US-based software company called Avea Solutions associated with billing/revenue cycle management in behavioral health.",
+        "There is a Swiss supplements brand called Avea (often styled as Avea Life) focused on longevity/nutraceutical products."
+    ],
+    "response_text": "Avea most commonly refers to the former Turkish mobile operator Avea İletişim Hizmetleri A.Ş. It was created in 2004 by merging Aria and Aycell, operated nationwide in Turkey as the third major mobile carrier, and offered GSM and 3G services. Avea became part of Türk Telekom, and in 2016 the Avea brand was retired when Türk Telekom unified its services under the Türk Telekom name. If you meant a different “AVEA,” there is also Avea Solutions in the U.S. (billing/RCM software for behavioral health) and a Swiss supplements brand called Avea focused on longevity products.",
+    "disambiguation_needed": true,
+    "other_entities": [
+        "Avea Solutions (U.S. billing/revenue cycle software for behavioral health providers)",
+        "Avea Life / Avea (Swiss longevity/nutraceuticals brand)"
+    ]
+}

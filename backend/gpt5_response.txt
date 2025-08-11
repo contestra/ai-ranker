@@ -1,0 +1,24 @@
+{
+  "classification": "OK_STRONG",
+  "confidence": 80,
+  "reasoning": "I recognize multiple real entities named 'Avea' and can provide specific, verifiable facts about at least two of them (the former Turkish mobile operator and the Avea ventilator product line). Because the name is ambiguous, disambiguation is needed.",
+  "specific_claims": [
+    "In 2004, Avea Iletisim Hizmetleri A.S. was formed in Turkey through the merger of the mobile operators Aria and Aycell.",
+    "Avea became the mobile arm of Turk Telekom, and the Avea brand was phased out around 2016 in favor of the unified Turk Telekom brand.",
+    "Avea operated as Turkey's third nationwide GSM mobile operator, competing with Turkcell and Vodafone (formerly Telsim).",
+    "The Avea ventilator is a critical-care mechanical ventilator platform originally marketed by CareFusion and later by Vyaire Medical, used in neonatal, pediatric, and adult intensive care settings.",
+    "Avea Solutions is a U.S.-based software company known for revenue-cycle/billing software for behavioral health and addiction treatment providers."
+  ],
+  "generic_claims": [
+    "The Turkish Avea was known for nationwide mobile voice and data services and consumer mobile plans.",
+    "The Avea ventilator is known for advanced ICU ventilation features and is used in hospitals.",
+    "Avea Solutions provides cloud-based tools aimed at improving reimbursement and claims workflows for healthcare providers."
+  ],
+  "response_text": "'Avea' can refer to several different entities:\n\n1) Avea (Turkey): A mobile network operator created in 2004 via the merger of Aria and Aycell. It operated as Turkey's third nationwide GSM operator and later became the mobile arm of Turk Telekom. The Avea brand was retired around 2016 when services were unified under the Turk Telekom name. Based in Turkey, it was known for consumer mobile voice and data services.\n\n2) Avea ventilator: A critical-care mechanical ventilator platform originally sold by CareFusion and later by Vyaire Medical (U.S.). It's used in neonatal, pediatric, and adult intensive care units and is known for advanced ventilation modes and monitoring capabilities.\n\n3) Avea Solutions (U.S.): A healthcare software company focused on revenue-cycle and billing solutions for behavioral health and addiction treatment providers. Known for cloud-based tools that help manage insurance claims and reimbursement workflows.\n\nWhich 'Avea' did you have in mind?",
+  "disambiguation_needed": true,
+  "other_entities": [
+    "Avea (Turkey) - former mobile operator, now under Turk Telekom brand",
+    "Avea ventilator - product line by Vyaire Medical",
+    "Avea Solutions - U.S. healthcare revenue-cycle software company"
+  ]
+}
