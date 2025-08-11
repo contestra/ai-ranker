@@ -41,7 +41,10 @@
       "Bash(npx next:*)",
       "Bash(dir:*)",
       "Bash(powershell:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git remote add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }

@@ -1,5 +1,9 @@
 # AI Ranker - Complete AI Visibility Suite
 
+**GitHub Repository:** https://github.com/contestra/ai-ranker  
+**Production Dashboard:** https://ai-ranker.fly.dev  
+**Documentation:** This document
+
 ## 🎯 Project Overview
 
 The **AI Ranker** (formerly AI Rank & Influence Tracker) is a comprehensive suite of tools for tracking and optimizing brand visibility across AI systems including ChatGPT, Perplexity, Claude, and other LLMs. It provides actionable insights for increasing brand recall through strategic content optimization and structured data management.

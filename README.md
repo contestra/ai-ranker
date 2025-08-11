@@ -1,6 +1,11 @@
 # AI Ranker - Complete AI Visibility & Influence Platform
 
+[![GitHub](https://img.shields.io/badge/GitHub-contestra%2Fai--ranker-blue)](https://github.com/contestra/ai-ranker)
+[![Production](https://img.shields.io/badge/Production-ai--ranker.fly.dev-green)](https://ai-ranker.fly.dev)
+
 A comprehensive suite for tracking and optimizing brand visibility across AI systems including ChatGPT, Perplexity, Claude, and other LLMs. Features bot traffic monitoring, crawlability analysis, and brand association tracking.
+
+**Repository:** https://github.com/contestra/ai-ranker
 
 ## 🚀 Quick Start
 
@@ -153,10 +158,12 @@ uvicorn app.main:app --reload  # In backend/
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch
+1. Fork the repository at https://github.com/contestra/ai-ranker
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
 3. Add tests for new features
-4. Submit pull request
+4. Commit your changes (`git commit -m 'Add amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Submit pull request
 
 ## 📄 License
 

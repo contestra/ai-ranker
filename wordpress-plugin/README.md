@@ -2,6 +2,9 @@
 
 A WordPress plugin that tracks AI bot traffic (ChatGPT, Perplexity, Claude, etc.) and sends data to your AI Ranker monitoring dashboard.
 
+**GitHub Repository:** https://github.com/contestra/ai-ranker  
+**Plugin Directory:** `wordpress-plugin/ai-crawler-monitor/`
+
 ## Features
 
 - **Server-side bot detection** - Catches all AI bots (they don't need to execute JavaScript)
