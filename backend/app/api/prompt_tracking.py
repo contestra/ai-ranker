@@ -17,6 +17,7 @@ from app.config import settings
 from app.services.evidence_pack_builder import evidence_pack_builder
 from app.services.als import als_service
 from app.services.als.country_codes import country_to_num, num_to_country
+from app.services.prompt_hasher import calculate_prompt_hash, verify_prompt_integrity
 
 router = APIRouter(prefix="/api/prompt-tracking", tags=["prompt-tracking"])
 
@@ -107,10 +108,13 @@ async def get_templates(brand_name: Optional[str] = None):
 async def create_template(template: PromptTemplate):
     """Create a new prompt template"""
     with engine.begin() as conn:
+        # Calculate hash for the prompt
+        prompt_hash = calculate_prompt_hash(template.prompt_text)
+        
         query = text("""
             INSERT INTO prompt_templates 
-            (brand_name, template_name, prompt_text, prompt_type, model_name, countries, grounding_modes, is_active)
-            VALUES (:brand, :name, :text, :type, :model, :countries, :modes, :active)
+            (brand_name, template_name, prompt_text, prompt_hash, prompt_type, model_name, countries, grounding_modes, is_active)
+            VALUES (:brand, :name, :text, :hash, :type, :model, :countries, :modes, :active)
             RETURNING id
         """)
         
@@ -123,6 +127,7 @@ async def create_template(template: PromptTemplate):
             "brand": template.brand_name,
             "name": template.template_name,
             "text": template.prompt_text,
+            "hash": prompt_hash,
             "type": template.prompt_type,
             "model": template.model_name,
             "countries": countries_json,
@@ -145,11 +150,15 @@ async def update_template(template_id: int, template: PromptTemplate):
         if not result:
             raise HTTPException(status_code=404, detail="Template not found")
         
+        # Calculate new hash for updated prompt
+        prompt_hash = calculate_prompt_hash(template.prompt_text)
+        
         # Update template
         update_query = text("""
             UPDATE prompt_templates 
             SET template_name = :name, 
-                prompt_text = :text, 
+                prompt_text = :text,
+                prompt_hash = :hash,
                 prompt_type = :type,
                 model_name = :model,
                 countries = :countries,
@@ -165,6 +174,7 @@ async def update_template(template_id: int, template: PromptTemplate):
             "id": template_id,
             "name": template.template_name,
             "text": template.prompt_text,
+            "hash": prompt_hash,
             "type": template.prompt_type,
             "model": template.model_name,
             "countries": countries_json,
@@ -391,13 +401,16 @@ async def run_prompt(request: PromptRunRequest):
                                 if keyword in sentence.lower():
                                     competitors.append(sentence.strip())
                     
+                    # Calculate hash of the actual prompt sent to the model
+                    execution_hash = calculate_prompt_hash(full_prompt)
+                    
                     # Save the result (simplified schema)
                     with engine.begin() as conn:
                         result_query = text("""
                             INSERT INTO prompt_results 
-                            (run_id, prompt_text, model_response, brand_mentioned, mention_count, 
+                            (run_id, prompt_text, prompt_hash, model_response, brand_mentioned, mention_count, 
                              competitors_mentioned, confidence_score)
-                            VALUES (:run_id, :prompt, :response, :mentioned, :count, 
+                            VALUES (:run_id, :prompt, :hash, :response, :mentioned, :count, 
                                     :competitors, :confidence)
                             RETURNING id
                         """)
@@ -409,6 +422,7 @@ async def run_prompt(request: PromptRunRequest):
                         conn.execute(result_query, {
                             "run_id": run_id,
                             "prompt": full_prompt,  # Save the full prompt with evidence pack
+                            "hash": execution_hash,  # Hash of the prompt for integrity checking
                             "response": response,
                             "mentioned": brand_mentioned,
                             "count": mention_count,

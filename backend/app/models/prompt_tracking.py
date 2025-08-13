@@ -15,6 +15,7 @@ class PromptTemplate(Base):
     brand_name = Column(String, nullable=False, index=True)
     template_name = Column(String, nullable=False)
     prompt_text = Column(Text, nullable=False)
+    prompt_hash = Column(String(64), index=True)  # SHA256 hash of prompt_text for integrity checking
     prompt_type = Column(String, default="custom")
     countries = Column(JSON, default=list)  # JSON for SQLite/PostgreSQL compatibility
     grounding_modes = Column(JSON, default=list)  # JSON for SQLite/PostgreSQL compatibility
@@ -52,6 +53,7 @@ class PromptResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     run_id = Column(Integer, ForeignKey("prompt_runs.id", ondelete="CASCADE"), index=True)
     prompt_text = Column(Text, nullable=False)
+    prompt_hash = Column(String(64))  # SHA256 hash of prompt sent to model (for verification)
     model_response = Column(Text)
     brand_mentioned = Column(Boolean, default=False)
     mention_count = Column(Integer, default=0)
