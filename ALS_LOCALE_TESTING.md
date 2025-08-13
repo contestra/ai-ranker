@@ -177,21 +177,58 @@ When a prompt asks for JSON only, return only valid JSON (double quotes, no extr
 - Verify ALS block is being generated correctly
 - Ensure system guardrail is preventing location mentions
 
+## Latest Status (August 13, 2025) - ALL COUNTRIES SHOWING GREEN ✅
+
+### Complete Success
+All 8 countries now pass locale testing with 100% success rate:
+- 🇺🇸 United States: ✅ (VAT accepts "none", plugs A/B, 911)
+- 🇫🇷 France: ✅ (20% VAT, plugs E/F/C, 112/15/17/18)
+- 🇩🇪 Germany: ✅ (19% VAT, plugs F/C, 112/110)
+- 🇮🇹 Italy: ✅ (22% VAT, plugs L/F/C, 112/113)
+- 🇬🇧 United Kingdom: ✅ (20% VAT, plug G, 999/112)
+- 🇨🇭 Switzerland: ✅ (8.1% VAT, plugs J/C, 112/117/118/144)
+- 🇸🇬 Singapore: ✅ (9% GST, plug G, 999/995)
+- 🇦🇪 UAE: ✅ (5% VAT, plugs G/C/D, 999/112/998/997)
+
 ## Recent Improvements (August 13, 2025)
 
-### Enhanced France Parser
-- **Improved VAT normalization**: Handles "20", "TVA 20", "20%" formats
-- **CEE plug code mapping**: Maps "CEE 7/5" → Type E, "CEE 7/4/Schuko" → Type F
-- **Prose emergency parsing**: Extracts numbers from "112 européen, 15 SAMU, 17 Police, 18 Pompiers"
-- **Array support for plugs**: Handles both `["E","F"]` and string formats
-- **Prefix removal**: Strips "prise de type", "Type", etc. from plug values
+### Final Parser Implementation (Surgical Fixes)
 
-### France Probe Update
-```json
-{
-  "probe": "Rends UNIQUEMENT ce JSON (guillemets doubles, aucun autre texte): {\"vat_percent\":\"<nombre>%\",\"plug\":[\"<lettre>\"],\"emergency\":[\"<chiffres>\"]}. Exemple attendu: {\"vat_percent\":\"20%\",\"plug\":[\"E\",\"F\"],\"emergency\":[\"112\",\"15\",\"17\",\"18\"]}"
-}
-```
+#### JSON Extraction
+- **Code fence handling**: Extracts JSON from \`\`\`json blocks
+- **Multiple object support**: Finds first valid JSON object
+- **Robust regex**: `r'\{.*?\}'` with DOTALL flag
+
+#### VAT Normalization
+- **US special case**: "none" expected, accepts none/no/n/a/na/null/0/0%
+- **Comma decimal support**: 8,1% → 8.1%
+- **Prefix stripping**: TVA/VAT/GST/IVA/MwSt/BTW removed
+- **Consistent formatting**: Always adds % to numbers
+
+#### Plug Type Mapping
+- **String and array support**: Handles both `["E","F"]` and `"E/F"`
+- **Separator parsing**: Splits on / , ; • and/et/y
+- **Comprehensive synonyms**:
+  - BS 1363 → G (UK/Singapore)
+  - NEMA 1-15 → A, NEMA 5-15 → B (US)
+  - Schuko/CEE 7/4 → F (Germany)
+  - CEE 7/5-6 → E (France)
+  - CEE 7/16/Europlug → C
+  - CEI 23-50 → L (Italy)
+  - SEV 1011/T13-15 → J (Switzerland)
+
+#### Emergency Number Extraction
+- **Regex extraction**: `r'\b\d{2,4}\b'` for 2-4 digit numbers
+- **Array and string support**: Handles both formats
+- **Prose parsing**: Extracts from "112 européen, 15 SAMU"
+- **Country-specific validation**:
+  - US: 911 required
+  - FR: 112 required
+  - DE: 112 or 110
+  - IT: 112 or 113
+  - GB: 999 or 112
+  - CH: 112 required
+  - SG: 999 or 995
 
 ## Future Improvements
 

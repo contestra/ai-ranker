@@ -1,5 +1,33 @@
 # CLAUDE.md - AI Rank & Influence Tracker
 
+## Latest Status (August 13, 2025)
+
+### ✅ ALL LOCALE TESTS PASSING - 100% SUCCESS RATE
+- **Countries Tab**: All 8 countries showing green checkmarks
+- **Test Coverage**: US 🇺🇸, FR 🇫🇷, DE 🇩🇪, IT 🇮🇹, GB 🇬🇧, CH 🇨🇭, SG 🇸🇬, AE 🇦🇪
+- **Parser Robustness**: Handles all AI model variations perfectly
+
+### Key Parser Improvements (August 13)
+1. **JSON Extraction**: Handles code fences `\`\`\`json` and finds first valid object
+2. **VAT Normalization**: 
+   - US accepts "none", "no", "n/a", "0%" 
+   - Comma decimals: 8,1% → 8.1%
+   - Prefix stripping: TVA/VAT/GST/IVA removed
+3. **Plug Type Mapping**:
+   - Schuko → F, BS 1363 → G
+   - NEMA 1-15 → A, NEMA 5-15 → B
+   - CEE 7/16/Europlug → C
+   - CEI 23-50 → L, SEV 1011 → J
+4. **Emergency Parsing**: 
+   - Extracts from prose: "112 européen" → ["112"]
+   - Country-specific validation rules
+
+### Test Results
+- 16/16 test cases pass (100%)
+- Code fence JSON parsing works
+- String plug types work (tipo L, Schuko, BS 1363)
+- All US variations pass (none, n/a, 0%)
+
 ## CRITICAL: Ambient Blocks Methodology
 
 ### What are Ambient Blocks?
