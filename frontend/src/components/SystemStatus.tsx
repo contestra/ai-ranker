@@ -25,6 +25,7 @@ interface SystemHealth {
   openai: ServiceStatus;
   gemini: ServiceStatus;
   background_runner: ServiceStatus;
+  langchain: ServiceStatus;
 }
 
 export default function SystemStatus() {
@@ -34,10 +35,12 @@ export default function SystemStatus() {
     cache: { name: 'Upstash Redis', status: 'checking', icon: CloudIcon },
     openai: { name: 'GPT-5', status: 'checking', icon: CpuChipIcon },
     gemini: { name: 'Gemini 2.5', status: 'checking', icon: CpuChipIcon },
-    background_runner: { name: 'Task Runner', status: 'checking', icon: ArrowPathIcon }
+    background_runner: { name: 'Task Runner', status: 'checking', icon: ArrowPathIcon },
+    langchain: { name: 'LangChain/LangSmith', status: 'checking', icon: CloudIcon }
   });
   
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastCheckTime, setLastCheckTime] = useState<string | null>(null);
 
   const checkHealth = async () => {
     setIsRefreshing(true);
@@ -85,8 +88,19 @@ export default function SystemStatus() {
           status: data.background_runner?.status || 'offline',
           message: `${data.background_runner?.active_tasks || 0} active tasks`,
           icon: ArrowPathIcon
+        },
+        langchain: {
+          name: 'LangChain/LangSmith',
+          status: data.langchain?.status || 'offline',
+          message: data.langchain?.status === 'healthy' 
+            ? `Tracing: ${data.langchain?.project || 'N/A'}`
+            : data.langchain?.message || 'Not configured',
+          icon: CloudIcon
         }
       });
+      
+      // Update last check time after successful check
+      setLastCheckTime(new Date().toLocaleTimeString());
     } catch (error) {
       // If backend is unreachable, mark everything as offline
       setHealth(prev => ({
@@ -96,8 +110,12 @@ export default function SystemStatus() {
         cache: { ...prev.cache, status: 'offline' },
         openai: { ...prev.openai, status: 'offline' },
         gemini: { ...prev.gemini, status: 'offline' },
-        background_runner: { ...prev.background_runner, status: 'offline' }
+        background_runner: { ...prev.background_runner, status: 'offline' },
+        langchain: { ...prev.langchain, status: 'offline' }
       }));
+      
+      // Update last check time even on error
+      setLastCheckTime(new Date().toLocaleTimeString());
     } finally {
       setIsRefreshing(false);
     }
@@ -108,15 +126,17 @@ export default function SystemStatus() {
     // No auto-refresh - user must manually click refresh button
   }, []);
 
-  const getStatusColor = (status: ServiceStatus['status']) => {
+  const getStatusColor = (status: ServiceStatus['status'] | 'disabled' | 'error') => {
     switch (status) {
       case 'healthy':
         return 'text-green-500';
       case 'degraded':
         return 'text-amber-500';
       case 'offline':
+      case 'error':
         return 'text-red-500';
       case 'checking':
+      case 'disabled':
         return 'text-gray-400';
     }
   };
@@ -216,13 +236,17 @@ export default function SystemStatus() {
           <ServiceRow service={health.openai} />
           
           <div className="border-t my-2" />
+          <div className="text-xs font-semibold text-gray-500 px-3 py-1">Services</div>
           <ServiceRow service={health.background_runner} />
+          <ServiceRow service={health.langchain} />
         </div>
 
         {/* Last Check Time */}
-        <div className="mt-3 text-center text-xs text-gray-400">
-          Last checked: {new Date().toLocaleTimeString()}
-        </div>
+        {lastCheckTime && (
+          <div className="mt-3 text-center text-xs text-gray-400">
+            Last checked: {lastCheckTime}
+          </div>
+        )}
       </div>
     </div>
   );

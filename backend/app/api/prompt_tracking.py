@@ -259,65 +259,48 @@ async def run_prompt(request: PromptRunRequest):
                     RETURNING id
                 """)
                 
-                run_result = conn.execute(run_query, {
-                    "template_id": request.template_id,
-                    "brand": request.brand_name,
-                    "model": request.model_name,
-                    "country": country_iso,  # Store ISO in DB for display
-                    "grounding": grounding_mode
-                })
-                run_id = run_result.fetchone()[0]
-            
-            try:
-                # Build Ambient Block for country-specific testing
-                ambient_block = ""
-                if country_num != 0:  # 0 is NONE
-                    # Use Ambient Blocks for clean, minimal civic signals
-                    # This avoids commercial content that could bias results
-                    if country_iso in ['DE', 'CH', 'US', 'GB', 'AE', 'SG', 'IT', 'FR']:
-                        try:
-                            ambient_block = als_service.build_als_block(country_iso)  # ALS needs ISO code
-                        except Exception as e:
-                            print(f"Failed to build Ambient Block for numeric {country_num} (ISO: {country_iso}): {e}")
-                            ambient_block = ""
-                    else:
-                        # Fallback for unsupported countries - use evidence pack
-                        country_queries = {
-                            'CH': 'SBB Fahrplan Zürich Halbtax',
-                            'US': 'DMV license renewal California IRS tax forms',
-                            'GB': 'NHS appointment booking UK driving licence DVLA',
-                            'DE': 'Führerschein verlängern Deutsche Bahn AOK Krankenkasse',
-                            'AE': 'Dubai RTA metro card Emirates ID renewal',
-                            'SG': 'CPF contribution Singapore MRT card SingPass'
-                        }
-                        search_query = country_queries.get(country, 'health supplements pharmacy')
-                        ambient_block = await evidence_pack_builder.build_evidence_pack(
-                            search_query,
-                            country,
-                            max_snippets=5,
-                            max_tokens=600
-                        )
+                    run_result = conn.execute(run_query, {
+                        "template_id": request.template_id,
+                        "brand": request.brand_name,
+                        "model": request.model_name,
+                        "country": country_iso,  # Store ISO in DB for display
+                        "grounding": grounding_mode
+                    })
+                    run_id = run_result.fetchone()[0]
                 
-                # Prepare prompt based on mode
-                if country_num == 0:  # NONE
-                    # Base model testing - no location context at all
-                    if grounding_mode == "web":
-                        full_prompt = f"""Please use web search to answer this question accurately:
-
-{prompt_text}"""
-                    else:
-                        full_prompt = f"""Based only on your training data (do not search the web):
-
-{prompt_text}"""
-                    context_message = None
-                else:
-                    # Country-specific testing - Ambient Block as SEPARATE message
-                    if ambient_block:
-                        # Keep prompt NAKED - Ambient Block goes in separate context message
-                        full_prompt = prompt_text  # UNMODIFIED user prompt
-                        context_message = ambient_block  # Ambient Block as separate message
-                    else:
-                        # Fallback if no evidence pack
+                try:
+                    # Build Ambient Block for country-specific testing
+                    ambient_block = ""
+                    if country_num != 0:  # 0 is NONE
+                        # Use Ambient Blocks for clean, minimal civic signals
+                        # This avoids commercial content that could bias results
+                        if country_iso in ['DE', 'CH', 'US', 'GB', 'AE', 'SG', 'IT', 'FR']:
+                            try:
+                                ambient_block = als_service.build_als_block(country_iso)  # ALS needs ISO code
+                            except Exception as e:
+                                print(f"Failed to build Ambient Block for numeric {country_num} (ISO: {country_iso}): {e}")
+                                ambient_block = ""
+                        else:
+                            # Fallback for unsupported countries - use evidence pack
+                            country_queries = {
+                                'CH': 'SBB Fahrplan Zürich Halbtax',
+                                'US': 'DMV license renewal California IRS tax forms',
+                                'GB': 'NHS appointment booking UK driving licence DVLA',
+                                'DE': 'Führerschein verlängern Deutsche Bahn AOK Krankenkasse',
+                                'AE': 'Dubai RTA metro card Emirates ID renewal',
+                                'SG': 'CPF contribution Singapore MRT card SingPass'
+                            }
+                            search_query = country_queries.get(country_iso, 'health supplements pharmacy')
+                            ambient_block = await evidence_pack_builder.build_evidence_pack(
+                                search_query,
+                                country_iso,
+                                max_snippets=5,
+                                max_tokens=600
+                            )
+                    
+                    # Prepare prompt based on mode
+                    if country_num == 0:  # NONE
+                        # Base model testing - no location context at all
                         if grounding_mode == "web":
                             full_prompt = f"""Please use web search to answer this question accurately:
 
@@ -327,128 +310,145 @@ async def run_prompt(request: PromptRunRequest):
 
 {prompt_text}"""
                         context_message = None
-                
-                # DEBUG: Log what we're about to send
-                print(f"\n{'='*60}")
-                print(f"PROMPT TRACKING API - ABOUT TO SEND:")
-                print(f"Using numeric ID: {country_num} internally (never passing ISO '{country_iso}' to AI)")
-                print(f"Model: {request.model_name}")
-                print(f"Naked Prompt: {full_prompt[:100]}...")
-                print(f"Has Ambient Block: {bool(context_message)}")
-                if context_message:
-                    print(f"Ambient Block preview: {context_message[:100]}...")
-                print(f"{'='*60}\n")
-                
-                # Use fixed parameters for reproducibility
-                temperature = 0.0  # Deterministic
-                seed = 42  # Fixed seed for reproducibility
-                
-                # Get model response based on selected model
-                # Now passing context as SEPARATE parameter, not concatenated!
-                if request.model_name in ["gemini", "gemini-flash"]:
-                    response_data = await adapter.analyze_with_gemini(
-                        full_prompt,  # Naked prompt
-                        grounding_mode == "web",  # Enable grounding for web mode
-                        model_name="gemini-2.0-flash-exp" if request.model_name == "gemini-flash" else "gemini-2.5-pro",
-                        temperature=temperature,
-                        seed=seed,
-                        context=context_message  # Context as separate parameter
-                    )
-                elif request.model_name in ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini"]:
-                    # Use GPT models (note: GPT-5 models currently return empty responses)
-                    response_data = await adapter.analyze_with_gpt4(
-                        full_prompt,  # Naked prompt
-                        model_name=request.model_name,
-                        temperature=temperature,
-                        seed=seed,
-                        context=context_message  # Context as separate parameter
-                    )
-                else:
-                    # Default fallback to Gemini
-                    response_data = await adapter.analyze_with_gemini(
-                        full_prompt,  # Naked prompt
-                        grounding_mode == "web",
-                        temperature=temperature,
-                        seed=seed,
-                        context=context_message  # Context as separate parameter
-                    )
-                
-                # Extract response content and metadata
-                response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
-                
-                # Analyze the response for brand mentions
-                brand_mentioned = request.brand_name.lower() in response.lower()
-                mention_count = response.lower().count(request.brand_name.lower())
-                
-                # Extract competitor mentions (simple approach)
-                competitors = []
-                competitor_keywords = ["competitor", "alternative", "rival", "competes with", "similar to"]
-                for keyword in competitor_keywords:
-                    if keyword in response.lower():
-                        # Extract sentence containing the keyword
-                        sentences = response.split('.')
-                        for sentence in sentences:
-                            if keyword in sentence.lower():
-                                competitors.append(sentence.strip())
-                
-                # Save the result (simplified schema)
-                with engine.begin() as conn:
-                    result_query = text("""
-                        INSERT INTO prompt_results 
-                        (run_id, prompt_text, model_response, brand_mentioned, mention_count, 
-                         competitors_mentioned, confidence_score)
-                        VALUES (:run_id, :prompt, :response, :mentioned, :count, 
-                                :competitors, :confidence)
-                        RETURNING id
-                    """)
+                    else:
+                        # Country-specific testing - Ambient Block as SEPARATE message
+                        if ambient_block:
+                            # Keep prompt NAKED - Ambient Block goes in separate context message
+                            full_prompt = prompt_text  # UNMODIFIED user prompt
+                            context_message = ambient_block  # Ambient Block as separate message
+                        else:
+                            # Fallback if no evidence pack
+                            if grounding_mode == "web":
+                                full_prompt = f"""Please use web search to answer this question accurately:
+
+{prompt_text}"""
+                            else:
+                                full_prompt = f"""Based only on your training data (do not search the web):
+
+{prompt_text}"""
+                            context_message = None
                     
-                    # Convert list to JSON string for SQLite
-                    import json as json_lib
-                    competitors_json = json_lib.dumps(competitors[:5] if competitors else [])
+                    # DEBUG: Log what we're about to send
+                    print(f"\n{'='*60}")
+                    print(f"PROMPT TRACKING API - ABOUT TO SEND:")
+                    print(f"Using numeric ID: {country_num} internally (never passing ISO '{country_iso}' to AI)")
+                    print(f"Model: {request.model_name}")
+                    print(f"Naked Prompt: {full_prompt[:100]}...")
+                    print(f"Has Ambient Block: {bool(context_message)}")
+                    if context_message:
+                        print(f"Ambient Block preview: {context_message[:100]}...")
+                    print(f"{'='*60}\n")
                     
-                    conn.execute(result_query, {
+                    # Use fixed parameters for reproducibility
+                    temperature = 0.0  # Deterministic
+                    seed = 42  # Fixed seed for reproducibility
+                    
+                    # Get model response based on selected model
+                    # Now passing context as SEPARATE parameter, not concatenated!
+                    if request.model_name in ["gemini", "gemini-flash"]:
+                        response_data = await adapter.analyze_with_gemini(
+                            full_prompt,  # Naked prompt
+                            grounding_mode == "web",  # Enable grounding for web mode
+                            model_name="gemini-2.0-flash-exp" if request.model_name == "gemini-flash" else "gemini-2.5-pro",
+                            temperature=temperature,
+                            seed=seed,
+                            context=context_message  # Context as separate parameter
+                        )
+                    elif request.model_name in ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini"]:
+                        # Use GPT models (note: GPT-5 models currently return empty responses)
+                        response_data = await adapter.analyze_with_gpt4(
+                            full_prompt,  # Naked prompt
+                            model_name=request.model_name,
+                            temperature=temperature,
+                            seed=seed,
+                            context=context_message  # Context as separate parameter
+                        )
+                    else:
+                        # Default fallback to Gemini
+                        response_data = await adapter.analyze_with_gemini(
+                            full_prompt,  # Naked prompt
+                            grounding_mode == "web",
+                            temperature=temperature,
+                            seed=seed,
+                            context=context_message  # Context as separate parameter
+                        )
+                    
+                    # Extract response content and metadata
+                    response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
+                    
+                    # Analyze the response for brand mentions
+                    brand_mentioned = request.brand_name.lower() in response.lower()
+                    mention_count = response.lower().count(request.brand_name.lower())
+                    
+                    # Extract competitor mentions (simple approach)
+                    competitors = []
+                    competitor_keywords = ["competitor", "alternative", "rival", "competes with", "similar to"]
+                    for keyword in competitor_keywords:
+                        if keyword in response.lower():
+                            # Extract sentence containing the keyword
+                            sentences = response.split('.')
+                            for sentence in sentences:
+                                if keyword in sentence.lower():
+                                    competitors.append(sentence.strip())
+                    
+                    # Save the result (simplified schema)
+                    with engine.begin() as conn:
+                        result_query = text("""
+                            INSERT INTO prompt_results 
+                            (run_id, prompt_text, model_response, brand_mentioned, mention_count, 
+                             competitors_mentioned, confidence_score)
+                            VALUES (:run_id, :prompt, :response, :mentioned, :count, 
+                                    :competitors, :confidence)
+                            RETURNING id
+                        """)
+                        
+                        # Convert list to JSON string for SQLite
+                        import json as json_lib
+                        competitors_json = json_lib.dumps(competitors[:5] if competitors else [])
+                        
+                        conn.execute(result_query, {
+                            "run_id": run_id,
+                            "prompt": full_prompt,  # Save the full prompt with evidence pack
+                            "response": response,
+                            "mentioned": brand_mentioned,
+                            "count": mention_count,
+                            "competitors": competitors_json,
+                            "confidence": 0.8 if brand_mentioned else 0.3
+                        })
+                        
+                        # Update run status
+                        update_query = text("""
+                            UPDATE prompt_runs 
+                            SET status = 'completed', completed_at = datetime('now')
+                            WHERE id = :id
+                        """)
+                        conn.execute(update_query, {"id": run_id})
+                    
+                    results.append({
                         "run_id": run_id,
-                        "prompt": full_prompt,  # Save the full prompt with evidence pack
-                        "response": response,
-                        "mentioned": brand_mentioned,
-                        "count": mention_count,
-                        "competitors": competitors_json,
-                        "confidence": 0.8 if brand_mentioned else 0.3
+                        "country": country_iso,  # Return ISO for display
+                        "grounding_mode": grounding_mode,
+                        "brand_mentioned": brand_mentioned,
+                        "mention_count": mention_count,
+                        "response_preview": response[:200] + "..." if len(response) > 200 else response
                     })
                     
-                    # Update run status
-                    update_query = text("""
-                        UPDATE prompt_runs 
-                        SET status = 'completed', completed_at = datetime('now')
-                        WHERE id = :id
-                    """)
-                    conn.execute(update_query, {"id": run_id})
-                
-                results.append({
-                    "run_id": run_id,
-                    "country": country_iso,  # Return ISO for display
-                    "grounding_mode": grounding_mode,
-                    "brand_mentioned": brand_mentioned,
-                    "mention_count": mention_count,
-                    "response_preview": response[:200] + "..." if len(response) > 200 else response
-                })
-                
-            except Exception as e:
-                # Update run with error
-                with engine.begin() as conn:
-                    error_query = text("""
-                        UPDATE prompt_runs 
-                        SET status = 'failed', error_message = :error, completed_at = datetime('now')
-                        WHERE id = :id
-                    """)
-                    conn.execute(error_query, {"id": run_id, "error": str(e)})
-                
-                results.append({
-                    "run_id": run_id,
-                    "country": country_iso,  # Return ISO for display
-                    "grounding_mode": grounding_mode,
-                    "error": str(e)
-                })
+                except Exception as e:
+                    # Update run with error
+                    with engine.begin() as conn:
+                        error_query = text("""
+                            UPDATE prompt_runs 
+                            SET status = 'failed', error_message = :error, completed_at = datetime('now')
+                            WHERE id = :id
+                        """)
+                        conn.execute(error_query, {"id": run_id, "error": str(e)})
+                    
+                    results.append({
+                        "run_id": run_id,
+                        "country": country_iso,  # Return ISO for display
+                        "grounding_mode": grounding_mode,
+                        "error": str(e)
+                    })
     
     return {
         "template_name": template.template_name,

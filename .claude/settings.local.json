@@ -46,7 +46,12 @@
       "Bash(git remote add:*)",
       "Bash(git commit:*)",
       "Bash(npm search:*)",
-      "Bash(claude-code mcp:*)"
+      "Bash(claude-code mcp:*)",
+      "Bash(npm search:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(grep:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

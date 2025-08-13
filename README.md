@@ -48,6 +48,14 @@ Ensure AI can access your content
 
 ### 4. **Entity Strength Dashboard**
 Measure brand recognition strength
+
+### 5. **Prompt Tracking System** (NEW)
+Systematic testing of AI responses across countries
+- Base Model testing for control baseline
+- Multi-country comparison (US, UK, DE, CH, UAE, SG)
+- Grounded vs ungrounded mode testing
+- Template management and analytics
+- Evidence pack support (coming soon)
 - Classification: KNOWN_STRONG, KNOWN_WEAK, UNKNOWN
 - Confidence scoring
 - Competitive comparison

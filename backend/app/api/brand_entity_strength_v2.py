@@ -244,6 +244,7 @@ async def check_brand_entity_strength_v2(request: BrandEntityRequestV2):
     brand_info = {}
     if request.domain:
         brand_info = await fetch_brand_info(request.domain)
+        print(f"DEBUG: Brand info fetched: {brand_info}")
     
     # Step 1: Get natural, unbiased response
     system_prompt, user_prompt = create_natural_prompt(request.brand_name)
@@ -279,31 +280,53 @@ async def check_brand_entity_strength_v2(request: BrandEntityRequestV2):
         if hasattr(classification, 'entity_names'):
             entity_names = classification.entity_names
         
-        # Determine disambiguation and confusion
+        # Start with the classification values
+        final_label = classification.classification
+        final_confidence = classification.confidence
+        final_reasoning = classification.reasoning
         disambiguation_needed = classification.multiple_entities
         confusion_detected = classification.classification == "CONFUSED"
         
         # If we have brand info, check if AI is talking about the right entity
         if brand_info and brand_info.get("industry"):
             actual_industry = brand_info["industry"]
-            # Simple check if the response mentions the right industry
+            print(f"DEBUG: Website industry detected: {actual_industry}")
+            # Check if the response mentions the right industry
             industry_keywords = {
-                "health/wellness": ["supplement", "health", "wellness", "vitamin"],
-                "telecommunications": ["telecom", "mobile", "carrier", "network"],
-                "software/tech": ["software", "app", "platform", "technology"]
+                "health/wellness": ["supplement", "health", "wellness", "vitamin", "longevity", "nmn", "swiss", "anti-aging", "cellular"],
+                "telecommunications": ["telecom", "mobile", "carrier", "network", "turk telekom", "turkish", "operator", "mobile network"],
+                "software/tech": ["software", "app", "platform", "technology", "saas", "api"]
             }
             
             if actual_industry in industry_keywords:
                 expected_words = industry_keywords[actual_industry]
-                if not any(word in natural_response.lower() for word in expected_words):
+                has_correct_industry = any(word in natural_response.lower() for word in expected_words)
+                
+                # Check for wrong industry mentions
+                wrong_industry_found = None
+                for other_industry, other_words in industry_keywords.items():
+                    if other_industry != actual_industry:
+                        if sum(1 for word in other_words if word in natural_response.lower()) >= 2:  # Need at least 2 mentions
+                            wrong_industry_found = other_industry
+                            break
+                
+                # If AI is talking about wrong entity, this is UNKNOWN for your brand
+                if wrong_industry_found and not has_correct_industry:
+                    print(f"DEBUG: Wrong industry detected! AI talks about {wrong_industry_found}, your site is {actual_industry}")
+                    print(f"DEBUG: Overriding classification to UNKNOWN")
+                    # Override classification - AI doesn't know YOUR brand
+                    final_label = "UNKNOWN"
+                    final_confidence = 5.0  # Very low confidence - AI doesn't know YOUR company
+                    final_reasoning = f"AI only knows about a {wrong_industry_found} company named '{request.brand_name}', not your {actual_industry} brand. Zero knowledge of your actual company."
                     confusion_detected = True
-                    classification.reasoning += f" (Website indicates {actual_industry} but response doesn't match)"
+                else:
+                    print(f"DEBUG: No override - has_correct: {has_correct_industry}, wrong_found: {wrong_industry_found}")
         
         # Create the final classification
         entity_classification = EntityClassificationV2(
-            label=classification.classification,
-            confidence=classification.confidence,
-            reasoning=classification.reasoning,
+            label=final_label,  # Use the potentially overridden label
+            confidence=final_confidence,  # Use the potentially overridden confidence
+            reasoning=final_reasoning,  # Use the potentially overridden reasoning
             natural_response=natural_response,
             classifier_analysis=classification,
             specific_facts_count=classification.specific_facts,

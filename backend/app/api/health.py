@@ -23,6 +23,14 @@ model_health_cache = {
     'gemini': {'last_check': None, 'status': 'unknown', 'response_time': None}
 }
 
+# Cache for LangChain health check
+langchain_health_cache = {
+    'last_check': None,
+    'status': 'unknown',
+    'tracing_enabled': False,
+    'project': None
+}
+
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
     """Comprehensive health check for all system components"""
@@ -38,7 +46,8 @@ async def health_check() -> Dict[str, Any]:
             'openai': {'status': 'checking'},
             'gemini': {'status': 'checking'}
         },
-        'background_runner': {'status': 'checking'}
+        'background_runner': {'status': 'checking'},
+        'langchain': {'status': 'checking'}
     }
     
     # Check database
@@ -185,6 +194,65 @@ async def health_check() -> Dict[str, Any]:
             'status': 'offline',
             'message': 'Not available'
         }
+    
+    # Check LangChain/LangSmith tracing
+    global langchain_health_cache
+    now = datetime.utcnow()
+    cache_duration = timedelta(minutes=5)
+    
+    if (langchain_health_cache['last_check'] is None or 
+        now - langchain_health_cache['last_check'] > cache_duration):
+        try:
+            # Check if LangChain API key is configured
+            if settings.langchain_api_key:
+                # Try to initialize LangSmith client
+                from langsmith import Client
+                client = Client(api_key=settings.langchain_api_key)
+                
+                # Check if we can connect to LangSmith
+                try:
+                    # List projects to verify connection
+                    projects = list(client.list_projects(limit=1))
+                    langchain_health_cache = {
+                        'last_check': now,
+                        'status': 'healthy',
+                        'tracing_enabled': True,
+                        'project': settings.langchain_project,
+                        'message': f'Connected to project: {settings.langchain_project}'
+                    }
+                except Exception as e:
+                    # API key is configured but can't connect
+                    langchain_health_cache = {
+                        'last_check': now,
+                        'status': 'degraded',
+                        'tracing_enabled': False,
+                        'project': settings.langchain_project,
+                        'message': 'API key configured but cannot connect'
+                    }
+            else:
+                # No API key configured
+                langchain_health_cache = {
+                    'last_check': now,
+                    'status': 'disabled',
+                    'tracing_enabled': False,
+                    'project': None,
+                    'message': 'No API key configured (tracing disabled)'
+                }
+        except Exception as e:
+            langchain_health_cache = {
+                'last_check': now,
+                'status': 'error',
+                'tracing_enabled': False,
+                'project': None,
+                'message': f'Error checking LangChain: {str(e)}'
+            }
+    
+    health_status['langchain'] = {
+        'status': langchain_health_cache['status'],
+        'tracing_enabled': langchain_health_cache['tracing_enabled'],
+        'project': langchain_health_cache.get('project'),
+        'message': langchain_health_cache.get('message')
+    }
     
     # Determine overall status
     if health_status['database']['status'] == 'offline':

@@ -152,7 +152,7 @@ probes = [
 
 Expected answers:
 - DE: 19% VAT, Type F plug, 112
-- CH: 7.7% VAT, Type J plug, 112
+- CH: 8.1% VAT, Type J plug, 112
 - US: No federal VAT, Type A/B plug, 911
 - GB: 20% VAT, Type G plug, 999
 

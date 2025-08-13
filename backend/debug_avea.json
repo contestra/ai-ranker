@@ -1,0 +1,31 @@
+{
+  "brand": "AVEA",
+  "information_vendor": "google",
+  "classifier_vendor": "gpt-4o-mini",
+  "classification": {
+    "label": "KNOWN_STRONG",
+    "confidence": 95.0,
+    "reasoning": "The response provides detailed and specific information about two distinct entities named 'AVEA': a former Turkish mobile network operator and a medical device. It includes specific facts such as dates, company names, and functions of the products. The response correctly disambiguates between the two entities without mixing them up, demonstrating a strong understanding of the brand. (Website indicates health/wellness but response doesn't match)",
+    "natural_response": "Of course. \"AVEA\" most commonly refers to one of two major things: a former telecommunications company or a medical device.\n\nHere is a breakdown of the most likely meanings:\n\n### 1. Avea (Turkish Mobile Network Operator)\n\nThis is the most common and widely known meaning.\n\n*   **What it was:** Avea was one of the three major mobile network operators in Turkey, alongside Turkcell and Vodafone Turkey.\n*   **History:** It was founded in 2004.\n*   **What happened to it:** In January 2016, its parent company, **Türk Telekom**, decided to consolidate its brands. The Avea brand was retired, and all mobile, landline, and internet services were merged under the single **\"Türk Telekom\"** brand.\n\n**In short: If you are thinking of the Turkish mobile phone company, it is now known as Türk Telekom.**\n\n---\n\n### 2. AVEA™ Ventilator (Medical Device)\n\nThe second most common reference is to a specific piece of medical equipment.\n\n*   **What it is:** The AVEA™ Ventilator is a sophisticated medical device used in hospitals, particularly in Intensive Care Units (ICUs) and Neonatal Intensive Care Units (NICUs).\n*   **Function:** It provides artificial respiration and breathing support to patients (from neonatal to adult) who are unable to breathe on their own.\n*   **Manufacturer:** The device is part of the portfolio of **Vyaire Medical**, a company that specializes in respiratory care.\n\n---\n\nTo give you the most accurate information, could you clarify which \"AVEA\" you are interested in?",
+    "classifier_analysis": {
+      "specific_facts": 7,
+      "generic_claims": 2,
+      "entities_mentioned": 3,
+      "multiple_entities": true,
+      "classification": "KNOWN_STRONG",
+      "confidence": 95.0,
+      "reasoning": "The response provides detailed and specific information about two distinct entities named 'AVEA': a former Turkish mobile network operator and a medical device. It includes specific facts such as dates, company names, and functions of the products. The response correctly disambiguates between the two entities without mixing them up, demonstrating a strong understanding of the brand. (Website indicates health/wellness but response doesn't match)"
+    },
+    "specific_facts_count": 7,
+    "generic_claims_count": 2,
+    "entities_mentioned": [],
+    "disambiguation_needed": true,
+    "confusion_detected": true,
+    "methodology": "two-step"
+  },
+  "timestamp": "2025-08-12T00:47:44.560314",
+  "raw_responses": {
+    "information_response": "Of course. \"AVEA\" most commonly refers to one of two major things: a former telecommunications company or a medical device.\n\nHere is a breakdown of the most likely meanings:\n\n### 1. Avea (Turkish Mobile Network Operator)\n\nThis is the most common and widely known meaning.\n\n*   **What it was:** Avea was one of the three major mobile network operators in Turkey, alongside Turkcell and Vodafone Turkey.\n*   **History:** It was founded in 2004.\n*   **What happened to it:** In January 2016, its parent company, **Türk Telekom**, decided to consolidate its brands. The Avea brand was retired, and all mobile, landline, and internet services were merged under the single **\"Türk Telekom\"** brand.\n\n**In short: If you are thinking of the Turkish mobile phone company, it is now known as Türk Telekom.**\n\n---\n\n### 2. AVEA™ Ventilator (Medical Device)\n\nThe second most common reference is to a specific piece of medical equipment.\n\n*   **What it is:** The AVEA™ Ventilator is a sophisticated medical device used in hospitals, particularly in Intensive Care Units (ICUs) and Neonatal Intensive Care Units (NICUs).\n*   **Function:** It provides artificial respiration and breathing support to patients (from neonatal to adult) who are unable to breathe on their own.\n*   **Manufacturer:** The device is part of the portfolio of **Vyaire Medical**, a company that specializes in respiratory care.\n\n---\n\nTo give you the most accurate information, could you clarify which \"AVEA\" you are interested in?",
+    "classification_response": "The response provides detailed and specific information about two distinct entities named 'AVEA': a former Turkish mobile network operator and a medical device. It includes specific facts such as dates, company names, and functions of the products. The response correctly disambiguates between the two entities without mixing them up, demonstrating a strong understanding of the brand. (Website indicates health/wellness but response doesn't match)"
+  }
+}

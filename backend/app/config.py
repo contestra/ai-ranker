@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     openai_api_key: str
     google_api_key: str
     anthropic_api_key: str
+    scraperapi_key: Optional[str] = None  # For geo-located API requests
+    proxy_enabled: bool = False  # Enable proxy for country-specific requests
+    exa_api_key: Optional[str] = None  # Exa.ai for semantic search
     langchain_api_key: Optional[str] = None
     langchain_tracing_v2: bool = True
     langchain_project: str = "ai-ranker"

@@ -75,9 +75,33 @@ async def ingest_generic_v2(
     domain = db.query(Domain).filter(Domain.url == request.domain).first()
     
     if not domain:
-        # Try to find brand and create domain
-        # For now, we'll skip unknown domains
-        return {"status": "error", "message": "Unknown domain. Please register domain first."}
+        # Auto-create domain with a default brand
+        # First, get or create a default brand for auto-registered domains
+        default_brand = db.query(Brand).filter(Brand.name == "Auto-Registered Domains").first()
+        if not default_brand:
+            default_brand = Brand(
+                name="Auto-Registered Domains",
+                description="Automatically registered domains from WordPress plugins"
+            )
+            db.add(default_brand)
+            db.commit()
+            db.refresh(default_brand)
+        
+        # Create the domain
+        domain = Domain(
+            brand_id=default_brand.id,
+            url=request.domain,
+            full_url=f"https://{request.domain}",
+            is_trackable=True,
+            tracking_method="wordpress_plugin",
+            technology="wordpress",
+            validation_status="auto_registered",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        db.add(domain)
+        db.commit()
+        db.refresh(domain)
     
     # Detect and classify bot
     bot_info = bot_detector.classify_bot(request.user_agent, request.client_ip)

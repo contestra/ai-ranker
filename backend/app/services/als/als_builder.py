@@ -4,6 +4,7 @@ Uses the new corrected templates with proper render_block method
 """
 
 from typing import Dict, List, Optional, Tuple
+# Use Unicode-safe templates with proper escape sequences
 from .als_templates import ALSTemplates
 
 class ALSBuilder:

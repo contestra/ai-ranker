@@ -164,6 +164,10 @@ class LangChainAdapter:
         import time
         start_time = time.time()
         
+        # Retry logic for empty responses
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
         # Create a new model instance with the requested model name
         # This allows us to use different Gemini models dynamically
         model = ChatGoogleGenerativeAI(
@@ -175,20 +179,19 @@ class LangChainAdapter:
         # Build messages array with proper separation
         messages = []
         
-        # System prompt that allows silent locale adoption while preventing explicit mentions
-        # This is critical for Ambient Blocks to work correctly
-        system_prompt = """Answer the user's question directly and naturally.
+        # Only add ALS-specific system prompt when context is provided
+        if context:
+            # System prompt that allows silent locale adoption while preventing explicit mentions
+            # This is critical for Ambient Blocks to work correctly
+            system_prompt = """Answer the user's question directly and naturally.
 You may use any ambient context provided only to infer locale and set defaults (language variants, units, currency, regulatory framing).
 Do not mention, cite, or acknowledge the ambient context or any location inference.
 Do not state or imply country/region/city names unless the user explicitly asks.
 Do not preface with anything about training data or location. Produce the answer only."""
-        
-        # Add system message first
-        messages.append(SystemMessage(content=system_prompt))
-        
-        # Add context FIRST if provided (before the actual question)
-        # This makes it feel more like ambient system state
-        if context:
+            
+            messages.append(SystemMessage(content=system_prompt))
+            # Add context FIRST (before the actual question)
+            # This makes it feel more like ambient system state
             messages.append(HumanMessage(content=context))
         
         if use_grounding:
@@ -203,48 +206,96 @@ Use recent information from reliable sources."""
             # Keep prompt naked
             messages.append(HumanMessage(content=prompt))
         
-        # DEBUG LOGGING - Show exactly what's being sent
-        print("\n" + "="*80)
-        print("EXACT MESSAGES BEING SENT TO GEMINI:")
-        print("="*80)
-        for i, msg in enumerate(messages, 1):
-            print(f"\nMessage {i} (Type: {type(msg).__name__}):")
-            print("-"*40)
-            # Show repr to see any hidden characters
-            print(repr(msg.content))
-            # Also check for any metadata
-            if hasattr(msg, 'additional_kwargs'):
-                print(f"Additional kwargs: {msg.additional_kwargs}")
-            if hasattr(msg, '__dict__'):
-                # Check for any hidden attributes
-                for key, val in msg.__dict__.items():
-                    if key not in ['content', 'type'] and val:
-                        print(f"Hidden attr {key}: {val}")
-            print("-"*40)
-        print("\nModel settings:")
-        print(f"- Model: {model_name}")
-        print(f"- Temperature: {temperature}")
-        print(f"- Seed: {seed}")
-        print(f"- Use grounding: {use_grounding}")
-        print("="*80 + "\n")
+        # DEBUG LOGGING - Show exactly what's being sent (disabled to avoid interference)
+        # print("\n" + "="*80)
+        # print("EXACT MESSAGES BEING SENT TO GEMINI:")
+        # print("="*80)
+        # for i, msg in enumerate(messages, 1):
+        #     print(f"\nMessage {i} (Type: {type(msg).__name__}):")
+        #     print("-"*40)
+        #     # Show repr to see any hidden characters
+        #     print(repr(msg.content))
+        #     # Also check for any metadata
+        #     if hasattr(msg, 'additional_kwargs'):
+        #         print(f"Additional kwargs: {msg.additional_kwargs}")
+        #     if hasattr(msg, '__dict__'):
+        #         # Check for any hidden attributes
+        #         for key, val in msg.__dict__.items():
+        #             if key not in ['content', 'type'] and val:
+        #                 print(f"Hidden attr {key}: {val}")
+        #     print("-"*40)
+        # print("\nModel settings:")
+        # print(f"- Model: {model_name}")
+        # print(f"- Temperature: {temperature}")
+        # print(f"- Seed: {seed}")
+        # print(f"- Use grounding: {use_grounding}")
+        # print("="*80 + "\n")
         
-        response = await model.ainvoke(
-            messages,
-            config={"callbacks": self.callbacks}
-        )
-        
-        response_time = int((time.time() - start_time) * 1000)
-        
-        # Extract metadata if available
-        result = {
-            "content": response.content if hasattr(response, 'content') else str(response),
-            "system_fingerprint": None,  # Gemini doesn't provide this
-            "model_version": model_name,
-            "temperature": temperature,
-            "seed": seed,
-            "response_time_ms": response_time,
-            "token_count": {}
-        }
+        # Retry loop for empty responses
+        for attempt in range(max_retries):
+            try:
+                response = await model.ainvoke(
+                    messages,
+                    config={"callbacks": self.callbacks}
+                )
+                
+                response_time = int((time.time() - start_time) * 1000)
+                
+                # Check if response is empty
+                content = response.content if hasattr(response, 'content') else str(response)
+                if not content or len(content.strip()) == 0:
+                    print(f"[WARNING] Gemini returned empty response on attempt {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        # Final attempt failed, return error response
+                        return {
+                            "content": "[ERROR] Gemini returned empty response after multiple retries.",
+                            "system_fingerprint": None,
+                            "model_version": model_name,
+                            "temperature": temperature,
+                            "seed": seed,
+                            "response_time_ms": response_time,
+                            "token_count": {},
+                            "error": "empty_response",
+                            "retry_attempts": max_retries
+                        }
+                
+                # Successful response
+                result = {
+                    "content": content,
+                    "system_fingerprint": None,  # Gemini doesn't provide this
+                    "model_version": model_name,
+                    "temperature": temperature,
+                    "seed": seed,
+                    "response_time_ms": response_time,
+                    "token_count": {}
+                }
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                print(f"[ERROR] Gemini API error on attempt {attempt + 1}/{max_retries}: {str(e)}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    # Final attempt failed
+                    return {
+                        "content": f"[ERROR] Gemini API error: {str(e)}",
+                        "system_fingerprint": None,
+                        "model_version": model_name,
+                        "temperature": temperature,
+                        "seed": seed,
+                        "response_time_ms": int((time.time() - start_time) * 1000),
+                        "token_count": {},
+                        "error": str(e),
+                        "retry_attempts": max_retries
+                    }
         
         # Try to get token usage if available
         if hasattr(response, 'response_metadata'):
@@ -268,17 +319,29 @@ Use recent information from reliable sources."""
         import time
         start_time = time.time()
         
+        # Retry logic for empty responses
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
         # Create a new model instance with the requested model name
-        # This allows us to use GPT-5, GPT-4o, etc. dynamically
-        # IMPORTANT: GPT-5 models ONLY support temperature=1.0
+        # GPT-5 models require temperature=1.0
         actual_temp = 1.0 if 'gpt-5' in model_name.lower() else temperature
         
-        model = ChatOpenAI(
-            model=model_name,  # Use the requested model (gpt-5, gpt-5-mini, gpt-4o, etc.)
-            temperature=actual_temp,  # GPT-5 requires 1.0, others can use any value
-            api_key=settings.openai_api_key,
-            max_tokens=2000  # Set appropriate token limit
-        )
+        # GPT-5 uses max_completion_tokens instead of max_tokens
+        if 'gpt-5' in model_name.lower():
+            model = ChatOpenAI(
+                model=model_name,
+                temperature=actual_temp,
+                api_key=settings.openai_api_key,
+                model_kwargs={"max_completion_tokens": 2000}  # GPT-5 specific parameter
+            )
+        else:
+            model = ChatOpenAI(
+                model=model_name,
+                temperature=actual_temp,
+                api_key=settings.openai_api_key,
+                max_tokens=2000  # Standard parameter for other models
+            )
         
         # OpenAI supports seed parameter for reproducibility
         invoke_kwargs = {"seed": seed} if seed is not None else {}
@@ -286,17 +349,19 @@ Use recent information from reliable sources."""
         # Build messages array with proper separation
         messages = []
         
-        # System prompt that allows silent locale adoption while preventing explicit mentions
-        system_prompt = """Answer the user's question directly and naturally.
+        # Only add ALS-specific system prompt when context is provided
+        if context:
+            # System prompt that allows silent locale adoption while preventing explicit mentions
+            # CRITICAL: DO NOT MODIFY WITHOUT EXPLICIT PERMISSION
+            system_prompt = """Answer the user's question directly and naturally.
 You may use any ambient context provided only to infer locale and set defaults (language variants, units, currency, regulatory framing).
 Do not mention, cite, or acknowledge the ambient context or any location inference.
 Do not state or imply country/region/city names unless the user explicitly asks.
 Do not preface with anything about training data or location. Produce the answer only."""
-        messages.append(SystemMessage(content=system_prompt))
-        
-        # Add context FIRST if provided (before the actual question)
-        # This makes it feel more like ambient system state
-        if context:
+            messages.append(SystemMessage(content=system_prompt))
+            
+            # Add context FIRST (before the actual question)
+            # This makes it feel more like ambient system state
             messages.append(HumanMessage(content=context))
         
         # User prompt (naked/unmodified)
@@ -304,45 +369,112 @@ Do not preface with anything about training data or location. Produce the answer
         
         # Add timeout for model calls
         import asyncio
-        try:
-            response = await asyncio.wait_for(
-                model.ainvoke(
-                    messages,
-                    config={"callbacks": self.callbacks},
-                    **invoke_kwargs
-                ),
-                timeout=30.0  # 30 second timeout
-            )
-        except asyncio.TimeoutError:
-            print(f"WARNING: {model_name} timed out after 30 seconds")
-            return {
-                "content": "",
-                "error": f"{model_name} timed out",
-                "model_version": model_name,
-                "response_time_ms": 30000
-            }
+        # GPT-5 needs longer timeout
+        timeout_seconds = 60.0 if 'gpt-5' in model_name.lower() else 30.0
         
-        response_time = int((time.time() - start_time) * 1000)
+        # Retry loop for empty responses
+        for attempt in range(max_retries):
+            try:
+                response = await asyncio.wait_for(
+                    model.ainvoke(
+                        messages,
+                        config={"callbacks": self.callbacks},
+                        **invoke_kwargs
+                    ),
+                    timeout=timeout_seconds
+                )
+                
+                response_time = int((time.time() - start_time) * 1000)
+                
+                # Check if response is empty
+                content = response.content if hasattr(response, 'content') else str(response)
+                # Skip debug printing to avoid encoding issues with Turkish/special characters
+                if not content or len(content.strip()) == 0:
+                    print(f"[WARNING] {model_name} returned empty response on attempt {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        await asyncio.sleep(retry_delay)
+                        retry_delay *= 2  # Exponential backoff
+                        continue
+                    else:
+                        # Final attempt failed, return error response
+                        return {
+                            "content": f"[ERROR] {model_name} returned empty response after multiple retries.",
+                            "system_fingerprint": None,
+                            "model_version": model_name,
+                            "temperature": temperature,
+                            "seed": seed,
+                            "response_time_ms": response_time,
+                            "token_count": {},
+                            "error": "empty_response",
+                            "retry_attempts": max_retries
+                        }
+                
+                # Successful response
+                result = {
+                    "content": content,
+                    "system_fingerprint": None,
+                    "model_version": model_name,
+                    "temperature": temperature,
+                    "seed": seed,
+                    "response_time_ms": response_time,
+                    "token_count": {}
+                }
+                
+                # OpenAI provides system_fingerprint and token usage
+                if hasattr(response, 'response_metadata'):
+                    metadata = response.response_metadata
+                    if 'system_fingerprint' in metadata:
+                        result["system_fingerprint"] = metadata['system_fingerprint']
+                    if 'token_usage' in metadata:
+                        result["token_count"] = metadata['token_usage']
+                    elif 'usage' in metadata:
+                        result["token_count"] = metadata['usage']
+                
+                return result
+                
+            except asyncio.TimeoutError:
+                print(f"[WARNING] {model_name} timed out after {timeout_seconds} seconds on attempt {attempt + 1}/{max_retries}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    # Final attempt failed
+                    return {
+                        "content": f"[ERROR] {model_name} timed out after {timeout_seconds} seconds.",
+                        "error": f"{model_name} timed out",
+                        "model_version": model_name,
+                        "response_time_ms": int((time.time() - start_time) * 1000),
+                        "token_count": {},
+                        "retry_attempts": max_retries
+                    }
+            except Exception as e:
+                print(f"[ERROR] {model_name} API error on attempt {attempt + 1}/{max_retries}: {str(e)}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+                    continue
+                else:
+                    # Final attempt failed
+                    return {
+                        "content": f"[ERROR] {model_name} API error: {str(e)}",
+                        "system_fingerprint": None,
+                        "model_version": model_name,
+                        "temperature": temperature,
+                        "seed": seed,
+                        "response_time_ms": int((time.time() - start_time) * 1000),
+                        "token_count": {},
+                        "error": str(e),
+                        "retry_attempts": max_retries
+                    }
         
-        # Extract metadata
-        result = {
-            "content": response.content if hasattr(response, 'content') else str(response),
-            "system_fingerprint": None,
+        # This should never be reached, but just in case
+        return {
+            "content": f"[ERROR] Unexpected error with {model_name}",
             "model_version": model_name,
-            "temperature": temperature,
-            "seed": seed,
-            "response_time_ms": response_time,
+            "response_time_ms": int((time.time() - start_time) * 1000),
             "token_count": {}
         }
-        
-        # OpenAI provides system_fingerprint and token usage
-        if hasattr(response, 'response_metadata'):
-            metadata = response.response_metadata
-            if 'system_fingerprint' in metadata:
-                result["system_fingerprint"] = metadata['system_fingerprint']
-            if 'token_usage' in metadata:
-                result["token_count"] = metadata['token_usage']
-            elif 'usage' in metadata:
-                result["token_count"] = metadata['usage']
-        
-        return result

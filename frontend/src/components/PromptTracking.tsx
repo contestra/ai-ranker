@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Countries from './Countries'
 import { 
   ExclamationCircleIcon, 
   PlayIcon, 
@@ -13,7 +14,11 @@ import {
   CheckCircleIcon, 
   XCircleIcon,
   PencilIcon,
-  DocumentDuplicateIcon 
+  DocumentDuplicateIcon,
+  DocumentTextIcon,
+  ClipboardDocumentListIcon,
+  ChartPieIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline'
 
 interface PromptTemplate {
@@ -89,7 +94,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
   const [runs, setRuns] = useState<PromptRun[]>([])
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(false)
-  const [runningTemplate, setRunningTemplate] = useState<number | null>(null)
+  const [runningTemplates, setRunningTemplates] = useState<Set<number>>(new Set())
   const [editingTemplate, setEditingTemplate] = useState<number | null>(null)
   const [expandedResults, setExpandedResults] = useState<{ [key: number]: any }>({})
   const [loadingResults, setLoadingResults] = useState<{ [key: number]: boolean }>({})
@@ -303,8 +308,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
   // Run prompt test
   const runPrompt = async (templateId: number) => {
     console.log(`Starting prompt run for template ${templateId}`)
-    setRunningTemplate(templateId)
-    setLoading(true)
+    setRunningTemplates(prev => new Set([...prev, templateId]))
     
     // Find the template to get its model
     const template = templates.find(t => t.id === templateId)
@@ -357,8 +361,11 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
         alert(`Failed to run test: ${error.message}`)
       }
     } finally {
-      setLoading(false)
-      setRunningTemplate(null)
+      setRunningTemplates(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(templateId)
+        return newSet
+      })
     }
   }
 
@@ -396,34 +403,42 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
     }
   }
 
+  // Import Lucide icons at the top of the component
+  const { FileText, ClipboardList, PieChart, Clock, Globe } = require('lucide-react')
+  
+  const tabs = [
+    { id: 'templates', label: 'Templates', icon: FileText },
+    { id: 'results', label: 'Results', icon: ClipboardList },
+    { id: 'analytics', label: 'Analytics', icon: PieChart },
+    { id: 'countries', label: 'Countries', icon: Globe },
+    { id: 'schedule', label: 'Schedule', icon: Clock }
+  ]
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Prompt Tracking</h2>
-          <p className="text-gray-500">
-            Test how AI models respond to prompts about {brandName} across different countries and grounding modes
-          </p>
+      {/* Tab navigation at the top */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200">
+          <nav className="flex">
+            {tabs.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-4 px-4 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </nav>
         </div>
-      </div>
-
-      {/* Tab navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          {['templates', 'results', 'analytics', 'schedule'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm capitalize ${
-                activeTab === tab
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
       </div>
 
       {/* Tab content */}
@@ -482,6 +497,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                         </option>
                       ))}
                     </select>
+                    {/* GPT-5 is now working - removed outdated warning */}
                   </div>
                   <div>
                     <label htmlFor="prompt-type" className="block text-sm font-medium text-gray-700 mb-1">
@@ -521,7 +537,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Countries</label>
+                    <label className="field-label">Countries</label>
                     <div className="flex flex-wrap gap-2">
                       {countries.map(country => (
                         <button
@@ -532,10 +548,10 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                               : [...newTemplate.countries, country.value]
                             setNewTemplate({ ...newTemplate, countries: updated })
                           }}
-                          className={`px-3 py-1 rounded-full text-sm ${
+                          className={`px-3 py-1 rounded-[50px] text-sm font-display transition-all duration-200 ${
                             newTemplate.countries.includes(country.value)
-                              ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                              : 'bg-gray-100 text-gray-700 border border-gray-300'
+                              ? 'bg-white text-contestra-gray-900 border border-contestra-gray-900'
+                              : 'bg-white text-contestra-text-meta border border-black/[0.06] hover:bg-contestra-gray-100'
                           }`}
                         >
                           {country.label}
@@ -545,7 +561,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Grounding Modes</label>
+                    <label className="field-label">Grounding Modes</label>
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
@@ -554,10 +570,10 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                             : [...newTemplate.grounding_modes, 'none']
                           setNewTemplate({ ...newTemplate, grounding_modes: updated })
                         }}
-                        className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                        className={`flex items-center px-3 py-1 rounded-[50px] text-sm font-display transition-all duration-200 ${
                           newTemplate.grounding_modes.includes('none')
-                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                            ? 'bg-white text-contestra-gray-900 border border-contestra-gray-900'
+                            : 'bg-white text-contestra-text-meta border border-black/[0.06] hover:bg-contestra-gray-100'
                         }`}
                       >
                         <CircleStackIcon className="w-4 h-4 mr-1" />
@@ -570,10 +586,10 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                             : [...newTemplate.grounding_modes, 'web']
                           setNewTemplate({ ...newTemplate, grounding_modes: updated })
                         }}
-                        className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                        className={`flex items-center px-3 py-1 rounded-[50px] text-sm font-display transition-all duration-200 ${
                           newTemplate.grounding_modes.includes('web')
-                            ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
-                            : 'bg-gray-100 text-gray-700 border border-gray-300'
+                            ? 'bg-white text-contestra-gray-900 border border-contestra-gray-900'
+                            : 'bg-white text-contestra-text-meta border border-black/[0.06] hover:bg-contestra-gray-100'
                         }`}
                       >
                         <GlobeAltIcon className="w-4 h-4 mr-1" />
@@ -585,7 +601,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
 
                 <button
                   onClick={saveTemplate}
-                  className="w-full flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  className="w-full btn-contestra-primary flex items-center justify-center"
                 >
                   <PlusIcon className="w-5 h-5 mr-2" />
                   {editingTemplate ? 'Update Template' : 'Create Template'}
@@ -626,11 +642,13 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                       </button>
                       <button
                         onClick={() => runPrompt(template.id)}
-                        disabled={loading || runningTemplate === template.id}
-                        className="flex items-center px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 ml-2"
+                        disabled={runningTemplates.has(template.id)}
+                        className={`flex items-center px-3 py-1 text-white rounded-[50px] hover:opacity-90 disabled:bg-contestra-gray-400 ml-2 transition-all duration-200 ${
+                          runningTemplates.has(template.id) ? 'bg-contestra-orange' : 'bg-contestra-green'
+                        }`}
                         title={`Run test with ${models.find(m => m.value === selectedModel)?.label || selectedModel}`}
                       >
-                        {runningTemplate === template.id ? (
+                        {runningTemplates.has(template.id) ? (
                           <>Running...</>
                         ) : (
                           <>
@@ -661,8 +679,8 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                       )}
                     </div>
                     <div className="flex items-center gap-2 ml-auto">
-                      <span className="text-xs text-gray-500">
-                        Model: <span className="font-medium text-indigo-600">{models.find(m => m.value === (template.model_name || 'gemini'))?.label || template.model_name || 'Gemini 2.5 Pro'}</span>
+                      <span className="text-xs text-contestra-text-meta font-mono tracking-[0.02em]">
+                        Model: <span className="font-medium text-contestra-accent">{models.find(m => m.value === (template.model_name || 'gemini'))?.label || template.model_name || 'Gemini 2.5 Pro'}</span>
                       </span>
                     </div>
                   </div>
@@ -687,7 +705,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                   fetchRuns()
                   fetchAnalytics()
                 }}
-                className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                className="px-4 py-2 bg-contestra-blue text-white rounded-[50px] hover:opacity-90 text-sm font-mono tracking-[0.02em] transition-all duration-200"
               >
                 Refresh Results
               </button>
@@ -715,7 +733,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => fetchResult(run.id)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                          className="px-4 py-2 bg-contestra-blue text-white rounded-[50px] hover:opacity-90 text-sm font-mono tracking-[0.02em] transition-all duration-200"
                         >
                           {expandedResults[run.id] ? 'Hide Response' : 'View Response'}
                         </button>
@@ -892,6 +910,11 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
               </div>
             </div>
           </>
+        )}
+
+        {/* Countries Tab */}
+        {activeTab === 'countries' && (
+          <Countries />
         )}
 
         {/* Schedule Tab */}

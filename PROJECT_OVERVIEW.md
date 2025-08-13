@@ -98,6 +98,15 @@ graph TB
 
 ### 7. **Entity Normalization System**
 - **Smart Aliasing**: Maps "Avea", "Avea Life", "Avea AG" → single brand entity
+
+### 8. **Prompt Tracking System** 🆕
+- **Geographic Testing**: Systematic testing across 6 countries (US, UK, DE, CH, UAE, SG)
+- **Base Model Control**: NONE country option for establishing baseline
+- **Evidence Pack Methodology**: Replicates consumer app behavior with country-specific context
+- **Template Management**: Save and reuse prompt configurations
+- **Analytics Dashboard**: Compare mention rates by country and grounding mode
+- **Scientific Controls**: Fixed parameters (temperature=0, seed=42) for reproducibility
+- **Key Finding**: APIs don't vary by IP; consumer apps use location + auto-grounding
 - **spaCy NER**: Extracts organizations, products, and persons
 - **Brand Cache**: Fast lookup for known brand variations
 - **Collision Handling**: Prevents false matches for common names

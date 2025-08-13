@@ -69,6 +69,28 @@ Thread-based task executor for avoiding HTTP context issues.
 | 🟡 **Degraded** | Amber | 10-50 active tasks (backlog forming) | Delayed processing |
 | 🔴 **Offline** | Red | Not available or > 50 active tasks | Processing blocked |
 
+### 7. LangChain/LangSmith (Added Aug 13, 2025)
+API tracing and debugging service for monitoring LLM calls.
+
+| Status | Indicator | Criteria | Impact |
+|--------|-----------|----------|--------|
+| 🟢 **Healthy** | Green | Connected to LangSmith, tracing enabled | Full API tracing |
+| 🟡 **Degraded** | Amber | API key configured but cannot connect | No tracing available |
+| ⚪ **Disabled** | Gray | No API key configured | Tracing not in use |
+| 🔴 **Error** | Red | Configuration error or invalid key | Tracing failed |
+
+**Benefits**:
+- Detailed traces of all LLM API calls
+- Request/response debugging
+- Performance monitoring
+- Error tracking and analysis
+- Project-based organization
+
+**Configuration**:
+- Set `LANGCHAIN_API_KEY` in `.env` file
+- Project name: `ai-ranker` (configured in settings)
+- Traces visible at https://smith.langchain.com
+
 ## Overall System Status
 
 The panel shows an aggregate status based on all components:
@@ -114,7 +136,13 @@ The panel shows an aggregate status based on all components:
     "openai": {...},
     "gemini": {...}
   },
-  "background_runner": {...}
+  "background_runner": {...},
+  "langchain": {
+    "status": "healthy",
+    "tracing_enabled": true,
+    "project": "ai-ranker",
+    "message": "Connected to project: ai-ranker"
+  }
 }
 ```
 

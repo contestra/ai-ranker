@@ -97,6 +97,86 @@ And thinks: "User is probably in Germany" → adapts response accordingly
 - ✅ Context sent BEFORE question (feels like prior state, not something to explain)
 - ✅ Fixed GPT-5 temperature requirement (must be 1.0)
 
+## MISSION-CRITICAL COMPONENTS - DO NOT MODIFY
+
+### ⚠️ CRITICAL: These components must NEVER be modified without explicit permission
+
+The following components are mission-critical to the Ambient Blocks methodology and have been carefully calibrated through extensive testing. Any modification to these can break the entire ALS (Ambient Location Signals) system:
+
+#### 1. System Prompts for ALS
+**Files**: 
+- `backend/app/llm/langchain_adapter.py` (lines 180-186, 292-296)
+
+**Current System Prompt** (DO NOT CHANGE):
+```
+Answer the user's question directly and naturally.
+You may use any ambient context provided only to infer locale and set defaults (language variants, units, currency, regulatory framing).
+Do not mention, cite, or acknowledge the ambient context or any location inference.
+Do not state or imply country/region/city names unless the user explicitly asks.
+Do not preface with anything about training data or location. Produce the answer only.
+```
+
+This prompt has been carefully crafted to:
+- Allow silent locale adoption from ALS
+- Prevent explicit location mentions that would reveal the test
+- Maintain natural responses without preambles
+- Work consistently across GPT-5 and Gemini models
+
+#### 2. ALS Templates
+**Files**:
+- `backend/app/services/als/als_templates.py` - NEVER modify Unicode escape sequences
+- `backend/app/services/als/als_templates_unicode.py` - Unicode validation version
+- `backend/app/services/als/als_templates_ascii.py` - ASCII fallback (deprecated)
+
+**Critical Elements**:
+- Unicode characters (ü, ö, ä, €, £, etc.) are ESSENTIAL for ALS to work
+- Character encoding must use proper escape sequences (\u00fc for ü, \u20ac for €)
+- Template structure (≤350 chars) is precisely calibrated
+- Civic keywords and formatting examples are locale-specific signals
+
+#### 3. Message Ordering for ALS
+**Location**: `langchain_adapter.py` methods `analyze_with_gemini()` and `analyze_with_gpt4()`
+
+**Critical Order** (DO NOT CHANGE):
+1. System prompt (if ALS context provided)
+2. ALS context as HumanMessage (ambient signals)
+3. User's actual question as HumanMessage (naked prompt)
+
+This ordering makes the ALS feel like prior system state rather than part of the question.
+
+#### 4. Temperature Settings for GPT-5
+**Location**: `langchain_adapter.py` line 273
+
+GPT-5 models REQUIRE `temperature=1.0` - any other value causes empty responses.
+The code automatically sets this regardless of requested temperature.
+
+#### 5. Background Runner Thread Isolation
+**File**: `backend/app/services/background_runner.py`
+
+The thread-based execution with new event loops is critical for preventing HTTP context leaks.
+DO NOT modify the threading or event loop creation logic.
+
+### Why These Are Mission-Critical
+
+1. **System Prompts**: Control how models interpret ALS without revealing the test
+2. **ALS Templates**: Provide precise civic signals for locale inference
+3. **Unicode Characters**: Essential for authentic locale signaling
+4. **Message Ordering**: Makes ALS feel like ambient context, not instructions
+5. **Temperature Settings**: GPT-5 won't work without exact 1.0 temperature
+6. **Thread Isolation**: Prevents geographic information from HTTP headers leaking into responses
+
+### Testing Before Any Changes
+
+If you absolutely must modify these components:
+1. Test with all 8 countries (DE, CH, US, GB, AE, SG, IT, FR)
+2. Run probe questions (VAT rate, plug type, emergency numbers)
+3. Check for location leaks in responses
+4. Verify Unicode characters display correctly
+5. Test both GPT-5 and Gemini models
+6. Run at least 10 iterations to check consistency
+
+Remember: These components took weeks to calibrate. A single character change can break everything.
+
 ## Supported Countries for Ambient Blocks (Updated Aug 12, 2025)
 
 ### Full Local Language Support:
@@ -113,6 +193,61 @@ And thinks: "User is probably in Germany" → adapts response accordingly
 
 ## Project Overview
 AI visibility and brand strength analysis tool that measures how well AI models (GPT-5, Gemini) recognize and understand brands with geographic localization via Ambient Blocks.
+
+## Recent Work (August 11-13, 2025)
+
+### Major Feature: Countries Tab with ALS Locale Testing (August 13, 2025)
+
+#### Added Countries Management System
+- Created 5th tab "Countries" in the Prompt Tracking interface
+- Database table for managing supported countries (8 initial countries)
+- Full CRUD API endpoints for country management
+- Support for 8 countries: DE, CH, FR, IT, US, GB, AE, SG
+
+#### Implemented Composite JSON Probe System
+**Approach**: Localized language probes with deterministic JSON output
+- Single composite probe per country in local language
+- German for DE/CH, French for FR, Italian for IT, Arabic for AE, English for US/GB/SG
+- All probes request JSON format: `{"vat_percent":"<>","plug":"<>","emergency":["<>"]}`
+- Reduces API calls from 3 to 1 per test
+
+#### Enhanced Parser Tolerance
+**VAT Parsing**:
+- Handles comma decimals: "8,1" → "8.1%"
+- Adds missing %: "20" → "20%"
+- Removes spaces: "20 %" → "20%"
+- Special US handling for "no federal VAT"
+
+**Plug Type Parsing**:
+- Case-insensitive matching
+- Removes prefixes: "Type", "Typ", "Tipo"
+- Handles multiple plugs: "L/F", "L,F", "L and F"
+- Comprehensive plug support per country:
+  - Germany: F, C (Schuko + Europlug)
+  - Switzerland: J, C
+  - France: E, F, C
+  - Italy: L, F, C
+  - UK: G only
+  - UAE: G, C, D
+  - US: A, B
+  - Singapore: G
+
+**Emergency Number Parsing**:
+- Extracts all 2-4 digit numbers
+- Handles various separators: comma, slash, "and"
+- Only requires primary number for pass
+- Complete emergency numbers for each country
+
+#### Visual Progress Indicators
+- Shows test progress (1/1 for composite probe)
+- Displays current probe being tested ("Locale Check")
+- Prevents duplicate concurrent tests
+- Traffic light status (green/yellow/red)
+
+#### System Guardrails
+- Explicit instruction: "Do not name countries/regions/cities or use country codes"
+- Prevents location leakage in AI responses
+- Allows locale inference without explicit mentions
 
 ## Recent Work (August 11-13, 2025)
 
@@ -187,31 +322,40 @@ npm run dev
 
 Access at: http://localhost:3001
 
-### Current Session Status (Aug 13, 2025)
-- Frontend running on port 3001
+### Current Session Status (Aug 13, 2025 - UPDATED)
+- Frontend running on port 3002 (was 3001)
 - Backend running on port 8000
 - All encoding issues resolved
-- GPT-5 models working with 30-second timeout
+- **GPT-5 models NOW WORKING properly** (25-30 second response times)
+- **ALS (Ambient Locale System) verified working with both GPT-5 and Gemini**
 - AVEA brand properly shows KNOWN_WEAK with disambiguation warning
 
-## Model Support Status
+## Model Support Status (UPDATED Aug 13, 2025)
 
 **Working Models:**
-- ✅ Google Gemini 2.5 Pro: Fast, reliable responses
-- ✅ GPT-5, GPT-5-mini, GPT-5-nano: Working with 30s timeout (may take 15-25 seconds)
-- ✅ GPT-4o: Working with timeout
+- ✅ **Google Gemini 2.5 Pro**: Fast, reliable responses, excellent ALS locale inference
+- ✅ **GPT-5, GPT-5-mini, GPT-5-nano**: NOW WORKING! Returns proper responses (25-30s)
+- ✅ **GPT-4o**: Working with proper responses
+
+**ALS Locale Inference Verified:**
+- ✅ Both GPT-5 and Gemini correctly adopt locale context
+- ✅ Tested with German locale - all probes passed:
+  - VAT rate: Returns 19% (German rate)
+  - Plug type: Returns Type F/Schuko (German standard)
+  - Emergency: Returns 112/110 (European/German numbers)
 
 **Notes:**
 - GPT-5 models require temperature=1.0 (automatically set)
-- Added 30-second timeout to prevent hanging on slow responses
+- GPT-5 uses `max_completion_tokens` parameter (not `max_tokens`)
+- 60-second timeout for GPT-5, 30-second for others
 - Background endpoint bypasses HTTP context to avoid location leaks
 
 ## Known Issues & Limitations
 
-1. **GPT-5 Response Times**: Can take 15-25 seconds per request
+1. **GPT-5 Response Times**: Takes 25-30 seconds per request (normal behavior)
 2. **Non-deterministic Results**: Models give slightly different answers each time
 3. **Brand Recognition**: Many smaller brands classified as UNKNOWN or WEAK
-4. **Location Leaks**: Some residual leaks may occur with certain prompt patterns
+4. ~~**GPT-5 Empty Responses**~~ → **RESOLVED as of Aug 13, 2025**
 
 ## Testing Commands
 
