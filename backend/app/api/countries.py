@@ -497,16 +497,19 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
     import json as json_module
     import re
     
-    # Extract JSON from response
+    # Extract JSON from response - robust to code fences and prose
     json_data = None
-    if "{" in response and "}" in response:
+    # Try to find the first valid JSON object in the response
+    candidates = re.findall(r'\{.*?\}', response, flags=re.DOTALL)
+    for cand in candidates:
         try:
-            # Extract JSON from response (might have extra text)
-            json_match = re.search(r'\{[^}]+\}', response)
-            if json_match:
-                json_data = json_module.loads(json_match.group())
-        except:
-            pass  # Fall back to individual parsing
+            json_data = json_module.loads(cand)
+            break
+        except Exception:
+            continue
+    # Safety net
+    if not isinstance(json_data, dict):
+        json_data = {}
     
     # Expected values by country (comprehensive and accurate)
     expectations = {
@@ -531,7 +534,7 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
             "emergency": ["112", "113", "115", "118"]  # 112 general, 113 police, 115 fire, 118 medical
         },
         "US": {
-            "vat": "No federal VAT",  # US has state sales tax, no federal VAT
+            "vat": "none",  # US has state sales tax, no federal VAT
             "plug": ["A", "B"],  # Type A (ungrounded) and Type B (grounded)
             "emergency": ["911"]  # Universal emergency number
         },
@@ -556,124 +559,89 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
     results = {}
     
     if json_data:
-        # Check VAT
-        vat_value = str(json_data.get("vat_percent", ""))
+        # --- VAT / TVA / IVA / GST normalizer ---
+        vat_value = str(json_data.get("vat_percent", "")).strip()
         
-        # Normalize VAT value
-        vat_value = vat_value.strip()
-        # Remove TVA/VAT/GST labels if present
-        vat_value = re.sub(r'^(TVA|VAT|GST|IVA|MwSt|BTW)\s*:?\s*', '', vat_value, flags=re.IGNORECASE)
-        # Replace comma with period for decimal (e.g., "8,1" -> "8.1")
-        vat_value = vat_value.replace(",", ".")
-        # Extract just the number if there's extra text
-        number_match = re.search(r'(\d+(?:\.\d+)?)\s*%?', vat_value)
-        if number_match:
-            vat_value = number_match.group(1)
-        # Add % if missing and it's a number
-        if vat_value and "%" not in vat_value and vat_value.replace(".", "").replace(" ", "").isdigit():
-            vat_value = f"{vat_value}%"
-        # Remove spaces between number and % (e.g., "20 %" -> "20%")
-        vat_value = vat_value.replace(" %", "%")
+        # US case: allow explicit "none" / "no" / "n/a" / "0"
+        if vat_value.lower() in {"none", "no", "n/a", "na", "null", "0", "0%"}:
+            normalized_vat = "none"
+        else:
+            # Remove common labels if present
+            vat_value = re.sub(r'^(TVA|VAT|GST|IVA|MwSt|BTW)\s*:?\s*', '', vat_value, flags=re.IGNORECASE)
+            # Convert comma to dot (e.g., 8,1 -> 8.1)
+            vat_value = vat_value.replace(",", ".")
+            # Extract number (optional decimals) with optional percent
+            m = re.search(r'(\d+(?:\.\d+)?)\s*%?', vat_value)
+            if m:
+                number = m.group(1)
+                normalized_vat = f"{number}%"
+            else:
+                normalized_vat = vat_value  # leave as-is if not numeric
         
         vat_expected = country_exp.get("vat", "Unknown")
-        vat_passed = False
         
-        # Special case for US - handle various "no VAT" responses
-        if country_code == "US":
-            no_vat_values = ["none", "no", "n/a", "na", "null", "0", "0%"]
-            if vat_value.lower() in no_vat_values or any(x in vat_value.lower() for x in ["no federal", "none", "n/a"]):
-                vat_passed = True
-                vat_value = "No federal VAT"  # Normalize display
-        # Compare normalized values
-        elif vat_value.replace("%", "").strip() == vat_expected.replace("%", "").strip():
-            vat_passed = True
-        elif vat_value.lower() == vat_expected.lower():
-            vat_passed = True
+        # Compare against expectations (strip % for numeric compare)
+        if vat_expected == "none":
+            vat_passed = (normalized_vat == "none")
+        else:
+            vat_passed = (
+                normalized_vat.replace("%", "").strip() ==
+                vat_expected.replace("%", "").strip()
+            )
         
         results["vat"] = {
             "question": "VAT/GST Rate",
             "response": response[:200],
             "passed": vat_passed,
             "expected": vat_expected,
-            "found": vat_value
+            "found": normalized_vat
         }
         
-        # Check Plug
+        # --- Plug type normalizer ---
         plug_value = json_data.get("plug", "")
-        
-        # Parse multiple plugs - handle both array and string formats
         plug_letters = set()
         
+        # Normalize to a list of candidate tokens
         if isinstance(plug_value, list):
-            # Handle array format ["E", "F"]
-            for item in plug_value:
-                item_str = str(item).upper().strip()
-                # Remove prefixes and extract letter
-                item_str = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', item_str, flags=re.IGNORECASE)
-                
-                # Comprehensive plug synonym mapping
-                if "BS 1363" in item_str or "BS1363" in item_str:
-                    plug_letters.add("G")  # UK/Singapore standard
-                elif "NEMA" in item_str:
-                    # Map NEMA codes to US plug types
-                    if "1-15" in item_str or "1-15P" in item_str:
-                        plug_letters.add("A")  # US Type A
-                    elif "5-15" in item_str or "5-15P" in item_str:
-                        plug_letters.add("B")  # US Type B
-                elif "CEE" in item_str:
-                    # Map CEE codes to plug types
-                    if "7/5" in item_str or "7/6" in item_str:
-                        plug_letters.add("E")
-                    elif "7/4" in item_str or "7/7" in item_str:
-                        plug_letters.add("F")
-                elif "SCHUKO" in item_str:
-                    plug_letters.add("F")
-                elif "CEI 23-50" in item_str or "CEI23-50" in item_str:
-                    plug_letters.add("L")  # Italian standard
-                elif any(x in item_str for x in ["T13", "T14", "T15", "SEV 1011", "SEV1011"]):
-                    plug_letters.add("J")  # Swiss standard
-                elif item_str and len(item_str) == 1 and item_str.isalpha():
-                    plug_letters.add(item_str)
+            candidates = [str(x) for x in plug_value]
         else:
-            # Handle string format
-            plug_value = str(plug_value).upper().strip()
-            # Remove prefixes
-            plug_value = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', plug_value, flags=re.IGNORECASE)
+            s = str(plug_value)
+            # Split on common separators and words like "and/et/y"
+            candidates = re.split(r'[/,;•]|\band\b|\bet\b|\by\b', s, flags=re.IGNORECASE)
+            candidates = [c.strip() for c in candidates if c.strip()]
+        
+        for item in candidates:
+            item_str = item.upper().strip()
+            # Remove prefixes (TYPE/Typ/tipo/prise de type/prise)
+            item_str = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', item_str, flags=re.IGNORECASE)
             
-            # Check for specific standards
-            if "BS 1363" in plug_value or "BS1363" in plug_value:
-                plug_letters.add("G")
-            elif "NEMA" in plug_value:
-                # Map NEMA codes to US plug types
-                if "1-15" in plug_value or "1-15P" in plug_value:
-                    plug_letters.add("A")
-                if "5-15" in plug_value or "5-15P" in plug_value:
-                    plug_letters.add("B")
-            elif "CEE" in plug_value:
-                if "7/5" in plug_value or "7/6" in plug_value:
-                    plug_letters.add("E")
-                if "7/4" in plug_value or "7/7" in plug_value:
-                    plug_letters.add("F")
-            elif "SCHUKO" in plug_value:
-                plug_letters.add("F")
-            elif "CEI 23-50" in plug_value or "CEI23-50" in plug_value:
-                plug_letters.add("L")
-            elif any(x in plug_value for x in ["T13", "T14", "T15", "SEV 1011", "SEV1011"]):
-                plug_letters.add("J")
+            # Synonyms → letter mapping (order matters)
+            if "BS 1363" in item_str or "BS1363" in item_str:
+                plug_letters.add("G")           # UK/SG
+            elif "NEMA" in item_str:
+                if "1-15" in item_str or "1-15P" in item_str:
+                    plug_letters.add("A")        # US Type A
+                elif "5-15" in item_str or "5-15P" in item_str:
+                    plug_letters.add("B")        # US Type B
+            elif "SCHUKO" in item_str:
+                plug_letters.add("F")           # DE/IT
+            elif "CEE" in item_str:
+                if "7/5" in item_str or "7/6" in item_str:
+                    plug_letters.add("E")       # FR
+                elif "7/4" in item_str or "7/7" in item_str:
+                    plug_letters.add("F")       # DE/FR
+                elif "7/16" in item_str:
+                    plug_letters.add("C")       # Europlug
+            elif "EUROPLUG" in item_str or "CEE7/16" in item_str.replace(" ", ""):
+                plug_letters.add("C")           # Europlug (C)
+            elif "CEI 23-50" in item_str or "CEI23-50" in item_str:
+                plug_letters.add("L")           # Italy
+            elif any(x in item_str for x in ["T13", "T14", "T15", "SEV 1011", "SEV1011"]):
+                plug_letters.add("J")           # Switzerland
             else:
-                # Parse multiple plugs from string
-                for separator in ["/", ",", " AND ", " ET ", " E ", " Y ", " OU ", " UND "]:
-                    if separator in plug_value:
-                        parts = plug_value.split(separator)
-                        for part in parts:
-                            cleaned = part.strip()
-                            if cleaned and len(cleaned) == 1 and cleaned.isalpha():
-                                plug_letters.add(cleaned)
-                        break
-                
-                # If no separator found, treat as single letter
-                if not plug_letters and plug_value and len(plug_value) == 1 and plug_value.isalpha():
-                    plug_letters.add(plug_value)
+                # Single letter
+                if len(item_str) == 1 and item_str.isalpha():
+                    plug_letters.add(item_str)
         
         plug_expected = country_exp.get("plug", [])
         if not isinstance(plug_expected, list):
@@ -694,23 +662,18 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
             "found": found_display
         }
         
-        # Check Emergency
+        # --- Emergency numbers ---
         emergency_value = json_data.get("emergency", [])
         emergency_numbers = []
         
+        def extract_digits(s):
+            return re.findall(r'\b\d{2,4}\b', str(s))
+        
         if isinstance(emergency_value, list):
-            # Handle array format - might contain prose or just numbers
             for item in emergency_value:
-                item_str = str(item)
-                # Extract all 2-4 digit numbers from each item
-                found_numbers = re.findall(r'\b\d{2,4}\b', item_str)
-                emergency_numbers.extend(found_numbers)
+                emergency_numbers.extend(extract_digits(item))
         else:
-            # Handle string format - extract all 2-4 digit numbers
-            emergency_str = str(emergency_value)
-            # Look for patterns like "112 européen, 15 SAMU, 17 Police, 18 Pompiers"
-            found_numbers = re.findall(r'\b\d{2,4}\b', emergency_str)
-            emergency_numbers.extend(found_numbers)
+            emergency_numbers.extend(extract_digits(emergency_value))
         
         # Remove duplicates while preserving order
         seen = set()
@@ -718,31 +681,23 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
         
         emergency_expected = country_exp.get("emergency", [])
         
-        # Country-specific emergency pass conditions
-        emergency_passed = False
-        if emergency_numbers and emergency_expected:
-            if country_code == "FR":
-                # France: must contain 112, ideally also 15, 17, 18
-                emergency_passed = "112" in emergency_numbers
-            elif country_code == "DE":
-                # Germany: must contain 112 or 110
-                emergency_passed = "112" in emergency_numbers or "110" in emergency_numbers
-            elif country_code == "IT":
-                # Italy: must contain 112 (113 is acceptable legacy)
-                emergency_passed = "112" in emergency_numbers or "113" in emergency_numbers
-            elif country_code == "SG":
-                # Singapore: should contain 999 and/or 995
-                emergency_passed = "999" in emergency_numbers or "995" in emergency_numbers
-            elif country_code == "CH":
-                # Switzerland: must contain 112, accept 117, 118, 144 too
-                emergency_passed = "112" in emergency_numbers
-            elif country_code == "GB":
-                # UK: must contain 999 or 112
-                emergency_passed = "999" in emergency_numbers or "112" in emergency_numbers
-            else:
-                # Default: primary emergency number should be first in expected list
-                primary = str(emergency_expected[0])
-                emergency_passed = primary in emergency_numbers
+        # Country-specific pass (pragmatic)
+        if country_code == "FR":
+            emergency_passed = "112" in emergency_numbers
+        elif country_code == "DE":
+            emergency_passed = ("112" in emergency_numbers) or ("110" in emergency_numbers)
+        elif country_code == "IT":
+            emergency_passed = ("112" in emergency_numbers) or ("113" in emergency_numbers)
+        elif country_code == "SG":
+            emergency_passed = ("999" in emergency_numbers) or ("995" in emergency_numbers)
+        elif country_code == "CH":
+            emergency_passed = "112" in emergency_numbers  # extras (117/118/144) are fine
+        elif country_code == "GB":
+            emergency_passed = ("999" in emergency_numbers) or ("112" in emergency_numbers)
+        elif country_code == "US":
+            emergency_passed = "911" in emergency_numbers
+        else:
+            emergency_passed = False
         
         results["emergency"] = {
             "question": "Emergency Number",
