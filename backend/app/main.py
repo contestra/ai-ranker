@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api import experiments, prompts, entities, metrics, dashboard, tracked_phrases, simple_analysis, real_analysis, embedding_analysis, comprehensive_analysis, pure_beeb, weekly_tracking, entity_extraction_beeb, contestra_v2_analysis, llm_crawlability, concordance_analysis, hybrid_analysis, brand_entity_strength, brand_entity_strength_v2, crawler_monitor, domains, crawler_monitor_v2, bot_analytics
+from app.api import experiments, prompts, entities, metrics, dashboard, tracked_phrases, simple_analysis, real_analysis, embedding_analysis, comprehensive_analysis, pure_beeb, weekly_tracking, entity_extraction_beeb, contestra_v2_analysis, llm_crawlability, concordance_analysis, hybrid_analysis, brand_entity_strength, brand_entity_strength_v2, crawler_monitor, domains, crawler_monitor_v2, bot_analytics, prompt_tracking, prompt_tracking_celery, prompt_tracking_background, health
 from app.database import engine, Base
 
 @asynccontextmanager
@@ -47,7 +47,11 @@ app.include_router(crawler_monitor.router, prefix="/api/crawler", tags=["crawler
 app.include_router(domains.router, prefix="/api/domains", tags=["domains"])
 app.include_router(crawler_monitor_v2.router, prefix="/api/crawler/v2", tags=["crawler_v2"])
 app.include_router(bot_analytics.router, prefix="/api/bot-analytics", tags=["bot_analytics"])
+app.include_router(prompt_tracking.router, tags=["prompt_tracking"])
+app.include_router(prompt_tracking_celery.router, tags=["prompt_tracking_celery"])
+app.include_router(prompt_tracking_background.router, tags=["prompt_tracking_background"])
+app.include_router(health.router, tags=["health"])
 
 @app.get("/")
 async def root():
-    return {"message": "AI Rank & Influence Tracker API", "version": "1.0.0"}
+    return {"message": "AI Rank & Influence Tracker API", "version": "2.1.0"}

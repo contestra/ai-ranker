@@ -10,6 +10,8 @@ import WeeklyTrends from '@/components/WeeklyTrends'
 import ConcordanceAnalysis from '@/components/ConcordanceAnalysis'
 import EntityStrengthDashboard from '@/components/EntityStrengthDashboard'
 import CrawlerMonitorV2 from '@/components/CrawlerMonitorV2'
+import PromptTracking from '@/components/PromptTracking'
+import SystemStatus from '@/components/SystemStatus'
 import TestButton from '@/components/TestButton'
 import { brandsApi } from '@/lib/api'
 
@@ -17,7 +19,7 @@ export default function Home() {
   const [brandInput, setBrandInput] = useState('')
   const [brandName, setBrandName] = useState('')
   const [brandId, setBrandId] = useState<number>(1)
-  const [activeTab, setActiveTab] = useState<'ai-visibility' | 'openai' | 'google' | 'comparison' | 'concordance' | 'entity-strength' | 'crawlability' | 'crawler-monitor' | 'trends' | 'anthropic' | 'settings'>('ai-visibility')
+  const [activeTab, setActiveTab] = useState<'ai-visibility' | 'openai' | 'google' | 'comparison' | 'concordance' | 'entity-strength' | 'crawlability' | 'crawler-monitor' | 'prompt-tracking' | 'trends' | 'anthropic' | 'settings'>('ai-visibility')
 
   const tabs = [
     { id: 'ai-visibility', label: 'AI Visibility', icon: '👁️' },
@@ -26,6 +28,7 @@ export default function Home() {
     { id: 'comparison', label: 'Comparison', icon: '🔬' },
     { id: 'concordance', label: 'Concordance', icon: '🔄' },
     { id: 'entity-strength', label: 'Entity Strength', icon: '💪' },
+    { id: 'prompt-tracking', label: 'Prompt Tracking', icon: '🎯' },
     { id: 'crawlability', label: 'LLM Crawlability', icon: '🕷️' },
     { id: 'crawler-monitor', label: 'Crawler Monitor', icon: '📡' },
     { id: 'trends', label: 'Weekly Trends', icon: '📈' },
@@ -109,6 +112,11 @@ export default function Home() {
                 </div>
               </div>
             )}
+            
+            {/* System Status Panel */}
+            <div className="mt-6">
+              <SystemStatus />
+            </div>
           </div>
         </div>
 
@@ -177,6 +185,9 @@ export default function Home() {
                 )}
                 {activeTab === 'entity-strength' && (
                   <EntityStrengthDashboard brandName={brandName} />
+                )}
+                {activeTab === 'prompt-tracking' && (
+                  <PromptTracking brandId={brandId} brandName={brandName} />
                 )}
                 {activeTab === 'trends' && (
                   <WeeklyTrends brandId={brandId} brandName={brandName} vendor="openai" />

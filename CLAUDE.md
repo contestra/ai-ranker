@@ -1,9 +1,120 @@
 # CLAUDE.md - AI Rank & Influence Tracker
 
-## Project Overview
-AI visibility and brand strength analysis tool that measures how well AI models (GPT-5, Gemini) recognize and understand brands.
+## CRITICAL: Ambient Blocks Methodology
 
-## Recent Work (August 11, 2025)
+### What are Ambient Blocks?
+
+**Ambient Blocks** are minimal context snippets (≤350 chars) containing ultra-neutral civic/government cues that make an AI naturally infer the user's location WITHOUT mentioning brands, products, or even the industry being tested.
+
+**The Goal**: Make the AI think "this user is in Germany" by providing tiny ambient cues (like timezone, government portal keywords, local formatting) that feel like system state or recent browsing - NOT by injecting search results.
+
+### How Ambient Blocks Work - The Clean Method
+
+#### 1. Build a Tiny Ambient Context Block (≤350 chars)
+For Germany, include 3-5 ultra-neutral signals:
+```
+Ambient Context (localization only; do not cite):
+- 2025-08-12 14:05, UTC+01:00
+- bund.de — "Führerschein verlängern"
+- 10115 Berlin • +49 30 xxxx xxxx • 12,90 €
+- national weather service shows Berlin
+```
+
+#### 2. Send as SEPARATE Message (Keep Prompt Naked!)
+```python
+# ✅ CORRECT - Prompt stays pure:
+messages = [
+    {"role": "system", "content": "Answer in user's language. If locale ambiguous, use Ambient Context. Do not cite it."},
+    {"role": "user", "content": ambient_block},    # Ambient signals
+    {"role": "user", "content": "What is AVEA?"}   # NAKED prompt
+]
+
+# ❌ WRONG - Never concatenate:
+prompt = ambient_block + "\nWhat is AVEA?"  # This contaminates the prompt!
+```
+
+#### 3. AI Naturally Infers Location
+The AI sees:
+- German timezone (UTC+01:00)
+- German government portal (bund.de)
+- German phone/postal format
+- EUR currency symbol
+
+And thinks: "User is probably in Germany" → adapts response accordingly
+
+### What Goes in an Ambient Block?
+
+#### ✅ INCLUDE (Civic/Neutral Only):
+- **Timestamp with timezone**: `2025-08-12 14:05, UTC+01:00`
+- **Government portals**: `bund.de`, `gov.uk`, `admin.ch` (domain only, no URLs)
+- **Civic keywords in local language**: `"Führerschein verlängern"` (renew license)
+- **Formatting samples**: `10115 Berlin • +49 30 xxxx xxxx • 12,90 €`
+- **Weather stub**: `national weather service shows Berlin` (no temp for evergreen content)
+- **Transit/agency acronyms**: `DB`, `SBB`, `DVLA`, `IRS`
+
+#### ❌ NEVER INCLUDE:
+- Commercial sites (Amazon, IKEA, retailers)
+- Brand names or product categories
+- News outlets or media brands
+- Anything related to the industry being tested
+- Search results or web snippets
+- URLs or clickable links
+
+### KEY PRINCIPLES
+
+1. **Ultra-minimal (≤350 chars total)**
+   - Longer blocks can steer content
+   - Just enough to tilt location inference
+
+2. **Purely civic/government signals**
+   - No commercial contamination
+   - Nothing that could bias brand responses
+
+3. **Local language for authenticity**
+   - German civic terms for Germany
+   - Not translations or English descriptions
+
+4. **Must be SEPARATE message**
+   - Never concatenate to prompt
+   - Prompt remains completely unmodified
+
+5. **One-time use per conversation**
+   - Never reuse chat threads
+   - Fresh context each time
+
+### Validation & Guardrails
+
+1. **Leak Detection**: After response, check if any 2-3 word phrases from Ambient Block appear in output
+2. **Probe Questions**: Test with "What's the VAT rate?" to confirm location inference worked
+3. **Fixed Parameters**: `temperature=0`, `top_p=1`, fixed seed for reproducibility
+
+### Current Implementation Status (Aug 12, 2025)
+- ✅ Ambient Blocks fully implemented for 8 countries
+- ✅ Context sent as SEPARATE message (not concatenated)
+- ✅ Replaced evidence pack with clean Ambient Blocks
+- ✅ All 8 countries available in frontend (DE, CH, US, GB, AE, SG, IT, FR)
+- ✅ System prompt allows silent locale adoption while preventing explicit mentions
+- ✅ Context sent BEFORE question (feels like prior state, not something to explain)
+- ✅ Fixed GPT-5 temperature requirement (must be 1.0)
+
+## Supported Countries for Ambient Blocks (Updated Aug 12, 2025)
+
+### Full Local Language Support:
+1. 🇩🇪 **Germany (DE)** - German throughout (bund.de, Bürgeramt, "Führerschein umtauschen")
+2. 🇮🇹 **Italy (IT)** - Italian throughout (Agenzia delle Entrate, "codice fiscale richiesta")
+3. 🇫🇷 **France (FR)** - French throughout (service-public.fr, "Carte d'identité renouvellement")
+4. 🇦🇪 **UAE (AE)** - Arabic throughout ("الهوية والجنسية", "تجديد بطاقة الهوية الإماراتية")
+
+### Bilingual/English:
+5. 🇨🇭 **Switzerland (CH)** - German header with German/French civic terms (ch.ch, admin.ch)
+6. 🇺🇸 **United States (US)** - English (state DMV/DOT, IRS, SSA, multi-timezone)
+7. 🇬🇧 **United Kingdom (GB)** - English (GOV.UK, DVLA, NHS, HMRC)
+8. 🇸🇬 **Singapore (SG)** - English (ICA, Singpass, CPF, HDB)
+
+## Project Overview
+AI visibility and brand strength analysis tool that measures how well AI models (GPT-5, Gemini) recognize and understand brands with geographic localization via Ambient Blocks.
+
+## Recent Work (August 11-13, 2025)
 
 ### Fixed Critical Issues
 
@@ -32,6 +143,15 @@ AI visibility and brand strength analysis tool that measures how well AI models 
 - Improved classification logic to downgrade to KNOWN_WEAK (not UNKNOWN) when disambiguation needed
 - Enhanced detection of when AI talks about wrong industry
 - Better handling of GPT-5's non-deterministic responses
+
+#### 4. Per-Template Model Selection ✅ (August 13, 2025)
+**Problem**: Model selection was global, changing one template's model changed all templates
+
+**Solution**:
+- Added `model_name` field to prompt_templates table
+- Updated frontend to save model_name per template
+- Fixed SQLAlchemy row access issue that prevented model_name from being retrieved
+- Each template now maintains its own model selection independently
 
 ## Test Case: AVEA Brand
 
@@ -67,30 +187,31 @@ npm run dev
 
 Access at: http://localhost:3001
 
-### Current Session Status (Aug 11, 2025)
-- Frontend running on port 3001 (bash_1)
-- Backend running on port 8000 (bash_10)
+### Current Session Status (Aug 13, 2025)
+- Frontend running on port 3001
+- Backend running on port 8000
 - All encoding issues resolved
-- **IMPORTANT**: All GPT-5 models return empty responses
-- **SOLUTION**: Using Google Gemini 2.5 Pro (works perfectly)
+- GPT-5 models working with 30-second timeout
 - AVEA brand properly shows KNOWN_WEAK with disambiguation warning
 
-## Critical Issue: OpenAI Models Return Empty Responses
+## Model Support Status
 
-**ALL GPT-5 models return empty strings:**
-- gpt-5, gpt-5-mini, gpt-5-nano: Empty responses
-- gpt-4o, gpt-4-turbo: Also empty through API (but work in direct OpenAI client tests)
+**Working Models:**
+- ✅ Google Gemini 2.5 Pro: Fast, reliable responses
+- ✅ GPT-5, GPT-5-mini, GPT-5-nano: Working with 30s timeout (may take 15-25 seconds)
+- ✅ GPT-4o: Working with timeout
 
-**Working Solution:**
-- Google Gemini 2.5 Pro: ✅ Returns proper responses
-- Frontend defaults to Gemini
-- See `GPT5_EMPTY_RESPONSE_ISSUE.md` for full details
+**Notes:**
+- GPT-5 models require temperature=1.0 (automatically set)
+- Added 30-second timeout to prevent hanging on slow responses
+- Background endpoint bypasses HTTP context to avoid location leaks
 
 ## Known Issues & Limitations
 
-1. **OpenAI Models Broken**: All OpenAI models return empty responses through our API
+1. **GPT-5 Response Times**: Can take 15-25 seconds per request
 2. **Non-deterministic Results**: Models give slightly different answers each time
 3. **Brand Recognition**: Many smaller brands classified as UNKNOWN or WEAK
+4. **Location Leaks**: Some residual leaks may occur with certain prompt patterns
 
 ## Testing Commands
 
@@ -130,6 +251,8 @@ if response.ok:
 - `GPT5_EMPTY_RESPONSE_ISSUE.md` - Documentation of GPT-5/GPT-4o empty response issue
 - `WINDOWS_ENCODING_FIX.md` - Detailed documentation of encoding fixes
 - `ENTITY_DISAMBIGUATION.md` - How disambiguation detection works
+- `DE_LEAK_INVESTIGATION.md` - Investigation of "DE" leak in Ambient Blocks
+- `LEAK_PREVENTION_FIXES.md` - Fixes applied to prevent location disclosure
 
 ## Deployment
 
@@ -153,44 +276,26 @@ Requires `FLY_API_TOKEN` environment variable set.
 
 For issues or questions about this codebase, reference this CLAUDE.md file which contains the most recent context and fixes applied.
 
-## MCP Servers & Tools Configuration
+## Development Environment & Tools
 
-### Connected MCP Servers
+### MCP Servers (Claude Development Tools)
 
-The following MCP (Model Context Protocol) servers are configured and connected in Claude Code:
+The following MCP (Model Context Protocol) servers are available to Claude during development sessions to assist with building and testing the AI Ranker application. These are NOT part of the deployed application:
 
-1. **sequential-thinking** - `npx @modelcontextprotocol/server-sequential-thinking`
-   - Step-by-step problem solving and reasoning
+1. **sequential-thinking** - Step-by-step problem solving during development
+2. **playwright** - Browser automation for testing UI features
+3. **lighthouse** - Performance analysis during development
+4. **fetch** - Web content retrieval for testing
+5. **memory** - Persistent memory for development context
+6. **filesystem** - File operations during development
+7. **sqlite** - Database testing and development
+8. **ref-tools** - Managing references and documentation
 
-2. **playwright** - `npx @playwright/mcp`
-   - Advanced browser automation with accessibility tree
+Note: These are Claude's development tools, not application dependencies.
 
-3. **lighthouse** - `npx @danielsogl/lighthouse-mcp`
-   - Website performance, accessibility, and UX analysis
+### Application Dependencies
 
-4. **fetch** - `npx @kazuph/mcp-fetch`
-   - Web content downloading and conversion
-
-5. **memory** - `npx @modelcontextprotocol/server-memory`
-   - Knowledge graph and persistent memory storage
-
-6. **filesystem** - `npx @modelcontextprotocol/server-filesystem`
-   - File operations across Documents, Projects, Downloads, Desktop
-
-7. **sqlite** - `npx mcp-sqlite C:\Users\leedr\Projects\test.db`
-   - Database operations with test.db file
-
-8. **ref-tools** - `npx @ref-tools/ref-tools-mcp`
-   - Reference management and citation tools
-   - GitHub: https://github.com/ref-tools/ref-tools-mcp
-   - Useful for tracking sources and references in brand analysis
-
-### Local Dependencies
-
-#### Browser Automation
-- **puppeteer** (^24.16.1) - Browser automation library
-
-#### Performance & Forms Libraries (Installed Aug 11, 2025)
+#### Frontend Libraries (Production)
 - **react-hook-form** - Performant forms with minimal re-renders (reduces unnecessary component updates)
 - **formik** - Alternative form library with built-in validation and field management
 - **lodash.debounce** - Debounce function for input delays (prevents API calls on every keystroke)
@@ -294,6 +399,121 @@ node backend/test_schema_extraction.js
 
 This tool helps ensure websites have properly structured data that AI models can understand, improving brand visibility and reducing ambiguity in AI responses.
 
-### Notes
-- MCP servers are configured globally in Claude Code, not in the project-specific `.claude/settings.local.json`
-- The `.claude/settings.local.json` file contains permission settings for various commands
+### Development Notes
+- MCP servers listed above are Claude's development tools, configured globally in Claude Code
+- The `.claude/settings.local.json` file contains permission settings for various commands during development
+- These tools help Claude build and test features but are not part of the deployed application
+
+## Prompt Tracking Feature (Added August 12, 2025)
+
+### Overview
+Added comprehensive prompt tracking system to test how AI models respond to prompts about brands across different countries and grounding modes.
+
+### Features Implemented
+1. **Template Management**
+   - Create, edit, copy, and delete prompt templates
+   - Save prompt configurations for reuse
+   - Support for multiple countries and grounding modes per template
+
+2. **Multi-Country Testing**
+   - Currently uses location context in prompts (e.g., "Location context: US")
+   - **NOTE**: Does NOT use actual proxy/VPN for geo-located requests
+   - Countries supported: US, GB, DE, CH, AE, SG
+
+3. **Grounding Modes**
+   - **Model Knowledge Only**: Uses only the model's training data
+   - **Grounded (Web Search)**: Uses model's native web search capability
+   - Can test both modes simultaneously for comparison
+
+4. **Model Selection**
+   - GPT-5, GPT-5 Mini, GPT-5 Nano (note: return empty responses via API)
+   - GPT-4o, GPT-4o Mini (legacy)
+   - Gemini 2.5 Pro, Gemini 2.5 Flash (recommended, working)
+
+5. **Analytics Dashboard**
+   - Overall mention rate and confidence scores
+   - Comparison by grounding mode
+   - Comparison by country
+   - Test run history with template names (not just IDs)
+
+### Technical Implementation
+- **Backend**: FastAPI endpoints in `app/api/prompt_tracking.py`
+- **Database**: SQLAlchemy models supporting both SQLite (local) and PostgreSQL (production)
+- **Frontend**: React component `PromptTracking.tsx` with full CRUD operations
+- **API Routes**:
+  - GET/POST `/api/prompt-tracking/templates`
+  - PUT/DELETE `/api/prompt-tracking/templates/{id}`
+  - POST `/api/prompt-tracking/run`
+  - GET `/api/prompt-tracking/analytics/{brand_name}`
+
+### Geographic Testing Implementation
+
+**Fundamental Truth**: Raw APIs (OpenAI, Gemini) **do NOT localize by caller IP**. Consumer apps show differences because they use location signals + auto-grounding.
+
+**Current Implementation**: Basic location context in prompts (e.g., "Location context: US")
+- ✅ Base Model (NONE) option now available for control testing
+- ⚠️ Simple context approach doesn't replicate real user experience
+- 📋 Ready for evidence pack implementation
+
+**Proper Implementation**: See [GEO_LOCATION_AI_TESTING.md](./GEO_LOCATION_AI_TESTING.md) for complete guide.
+
+**Testing Modes**:
+1. **Base Model Testing (NONE)** - Control baseline ✅ IMPLEMENTED
+   - Pure model response, no geographic influence
+   - Fixed: temperature=0, seed=42, top_p=1
+   - Expect identical outputs when system_fingerprint matches
+   
+2. **Evidence Pack Mode** - Replicate consumer apps 🚧 TODO
+   - 3-5 neutral snippets (≤600 tokens) as separate message
+   - Country-specific sources: health portals, retailers, news
+   - NO directives ("use CHF"), only neutral facts
+   
+3. **Legacy Location Context** - Current simple implementation ✅ WORKING
+   - Adds "Location context: {country}" to prompt
+   - Temporary until evidence packs implemented
+
+**Key Implementation Path** - Country-Scoped Evidence Priming with Context Blocks:
+1. **Search with country parameters**: Google (`gl=ch`, `hl=de`, `lr=lang_de`) or Bing (`mkt=de-CH`)
+2. **Build minimal evidence pack**: 3-5 snippets, 300-600 tokens total (≤20% of token budget)
+   - Government/health sites
+   - Local retailers with prices in CHF/EUR/etc
+   - Major local news sources
+   - Each snippet only 1-2 lines
+3. **CRITICAL - Use Evidence Priming via Context Blocks**: 
+   - Send evidence as **separate message** in API payload
+   - Keep user prompt "naked" and unmodified
+   - Add evidence as additional message in the messages array
+   - Use **evidence priming** (neutral facts) NOT instruction priming (directives like "use CHF")
+   - Do NOT concatenate to the prompt text
+4. **Let model naturally incorporate**: Local prices, regulations, and sources guide the response
+
+**Correct Implementation Example (OpenAI)**:
+```python
+messages = [
+    {"role": "system", "content": "Answer the question. Consider Context only if relevant."},
+    {"role": "user", "content": "name top 10 longevity supplements"},  # NAKED prompt
+    {"role": "user", "content": "Context:\n- (Migros.ch): Longevity from CHF 89.90...\n- (bag.admin.ch): Swiss Federal Office recommends..."}  # SEPARATE message
+]
+```
+
+This exactly replicates what consumer apps do - they vary the search sources by location via separate context, not by modifying the model or prompt itself.
+
+### Key Insights from Research
+1. **Proxies are useless for LLM APIs** - They authenticate by key, not IP
+2. **Proxies ARE useful for retrieval** - SERPs and retailer pages DO vary by country
+3. **Regional endpoints (EU/US)** - For data residency, NOT content localization
+4. **Headers don't work** - CF-IPCountry, Accept-Language don't affect API responses
+5. **Instruction vs Evidence priming** - Heavy steering vs light touch neutral facts
+
+### Implementation Architecture (6-Country Testing)
+**Recommended**: Edge router (Cloudflare) + Regional Lambda functions
+- US: us-east-1, UK: eu-west-2, DE: eu-central-1
+- CH: eu-central-2, UAE: me-central-1, SG: ap-southeast-1
+- Cost: ~$0 at 100 tests/day (within free tiers)
+
+### Known Limitations & Status
+1. ✅ Base Model testing implemented (NONE country option)
+2. 🚧 Evidence pack implementation pending (currently using simple context)
+3. ⚠️ GPT-5 models return empty responses (use Gemini)
+4. 📋 System_fingerprint tracking ready in schema, not yet utilized
+5. 🔄 Need N=10 repeats per country for statistical significance
