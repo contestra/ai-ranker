@@ -151,7 +151,7 @@ async def test_country_als(request: TestCountryRequest):
             ("composite", 'Gib NUR JSON im Format aus: {"vat_percent":"<Zahl>%","plug":"<Buchstabe A-N>","emergency":["<Ziffern>","<Ziffern>"]}. Sonst nichts.')
         ],
         "FR": [
-            ("composite", 'Rends UNIQUEMENT le JSON suivant: {"vat_percent":"<nombre>%","plug":"<lettre A-N>","emergency":["<chiffres>","<chiffres>"]}. Rien d\'autre.')
+            ("composite", 'Rends UNIQUEMENT ce JSON (guillemets doubles, aucun autre texte): {"vat_percent":"<nombre>%","plug":["<lettre>"],"emergency":["<chiffres>"]}. Exemple attendu: {"vat_percent":"20%","plug":["E","F"],"emergency":["112","15","17","18"]}')
         ],
         "IT": [
             ("composite", 'Fornisci SOLO il seguente JSON: {"vat_percent":"<numero>%","plug":"<lettera A-N>","emergency":["<cifre>","<cifre>"]}. Nient\'altro.')
@@ -561,8 +561,14 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
         
         # Normalize VAT value
         vat_value = vat_value.strip()
+        # Remove TVA/VAT/GST labels if present
+        vat_value = re.sub(r'^(TVA|VAT|GST|IVA|MwSt|BTW)\s*:?\s*', '', vat_value, flags=re.IGNORECASE)
         # Replace comma with period for decimal (e.g., "8,1" -> "8.1")
         vat_value = vat_value.replace(",", ".")
+        # Extract just the number if there's extra text
+        number_match = re.search(r'(\d+(?:\.\d+)?)\s*%?', vat_value)
+        if number_match:
+            vat_value = number_match.group(1)
         # Add % if missing and it's a number
         if vat_value and "%" not in vat_value and vat_value.replace(".", "").replace(" ", "").isdigit():
             vat_value = f"{vat_value}%"
@@ -590,28 +596,52 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
         }
         
         # Check Plug
-        plug_value = str(json_data.get("plug", ""))
+        plug_value = json_data.get("plug", "")
         
-        # Normalize plug value
-        plug_value = plug_value.upper().strip()
-        # Remove "TYPE", "TYP", "TIPO" prefixes
-        plug_value = re.sub(r'^(TYPE|TYP|TIPO)\s*', '', plug_value, flags=re.IGNORECASE)
-        
-        # Parse multiple plugs (e.g., "L/F", "L,F", "L and F")
+        # Parse multiple plugs - handle both array and string formats
         plug_letters = set()
-        # Split by common separators
-        for separator in ["/", ",", " AND ", " E ", " Y ", " OU ", " UND "]:
-            if separator in plug_value.upper():
-                parts = plug_value.upper().split(separator)
-                for part in parts:
-                    cleaned = part.strip()
-                    if cleaned and len(cleaned) == 1 and cleaned.isalpha():
-                        plug_letters.add(cleaned)
-                break
         
-        # If no separator found, treat as single letter
-        if not plug_letters and plug_value and len(plug_value) == 1 and plug_value.isalpha():
-            plug_letters.add(plug_value)
+        if isinstance(plug_value, list):
+            # Handle array format ["E", "F"]
+            for item in plug_value:
+                item_str = str(item).upper().strip()
+                # Remove prefixes and extract letter
+                item_str = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', item_str, flags=re.IGNORECASE)
+                # Handle CEE notations
+                if "CEE" in item_str.upper():
+                    # Map CEE codes to plug types
+                    if "7/5" in item_str or "7/6" in item_str:
+                        plug_letters.add("E")
+                    elif "7/4" in item_str or "7/7" in item_str or "SCHUKO" in item_str.upper():
+                        plug_letters.add("F")
+                elif item_str and len(item_str) == 1 and item_str.isalpha():
+                    plug_letters.add(item_str)
+        else:
+            # Handle string format
+            plug_value = str(plug_value).upper().strip()
+            # Remove prefixes
+            plug_value = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', plug_value, flags=re.IGNORECASE)
+            
+            # Check for CEE codes
+            if "CEE" in plug_value:
+                if "7/5" in plug_value or "7/6" in plug_value:
+                    plug_letters.add("E")
+                if "7/4" in plug_value or "7/7" in plug_value or "SCHUKO" in plug_value:
+                    plug_letters.add("F")
+            else:
+                # Parse multiple plugs from string
+                for separator in ["/", ",", " AND ", " ET ", " E ", " Y ", " OU ", " UND "]:
+                    if separator in plug_value:
+                        parts = plug_value.split(separator)
+                        for part in parts:
+                            cleaned = part.strip()
+                            if cleaned and len(cleaned) == 1 and cleaned.isalpha():
+                                plug_letters.add(cleaned)
+                        break
+                
+                # If no separator found, treat as single letter
+                if not plug_letters and plug_value and len(plug_value) == 1 and plug_value.isalpha():
+                    plug_letters.add(plug_value)
         
         plug_expected = country_exp.get("plug", [])
         if not isinstance(plug_expected, list):
@@ -634,13 +664,25 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
         
         # Check Emergency
         emergency_value = json_data.get("emergency", [])
-        if isinstance(emergency_value, str):
-            # Parse single string that might contain multiple numbers
-            # Extract all 2-4 digit numbers
-            emergency_value = re.findall(r'\b\d{2,4}\b', emergency_value)
+        emergency_numbers = []
         
-        # Normalize emergency numbers (convert to strings)
-        emergency_numbers = [str(e).strip() for e in emergency_value if e]
+        if isinstance(emergency_value, list):
+            # Handle array format - might contain prose or just numbers
+            for item in emergency_value:
+                item_str = str(item)
+                # Extract all 2-4 digit numbers from each item
+                found_numbers = re.findall(r'\b\d{2,4}\b', item_str)
+                emergency_numbers.extend(found_numbers)
+        else:
+            # Handle string format - extract all 2-4 digit numbers
+            emergency_str = str(emergency_value)
+            # Look for patterns like "112 européen, 15 SAMU, 17 Police, 18 Pompiers"
+            found_numbers = re.findall(r'\b\d{2,4}\b', emergency_str)
+            emergency_numbers.extend(found_numbers)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        emergency_numbers = [x for x in emergency_numbers if not (x in seen or seen.add(x))]
         
         emergency_expected = country_exp.get("emergency", [])
         

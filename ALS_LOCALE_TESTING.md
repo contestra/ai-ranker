@@ -177,6 +177,22 @@ When a prompt asks for JSON only, return only valid JSON (double quotes, no extr
 - Verify ALS block is being generated correctly
 - Ensure system guardrail is preventing location mentions
 
+## Recent Improvements (August 13, 2025)
+
+### Enhanced France Parser
+- **Improved VAT normalization**: Handles "20", "TVA 20", "20%" formats
+- **CEE plug code mapping**: Maps "CEE 7/5" → Type E, "CEE 7/4/Schuko" → Type F
+- **Prose emergency parsing**: Extracts numbers from "112 européen, 15 SAMU, 17 Police, 18 Pompiers"
+- **Array support for plugs**: Handles both `["E","F"]` and string formats
+- **Prefix removal**: Strips "prise de type", "Type", etc. from plug values
+
+### France Probe Update
+```json
+{
+  "probe": "Rends UNIQUEMENT ce JSON (guillemets doubles, aucun autre texte): {\"vat_percent\":\"<nombre>%\",\"plug\":[\"<lettre>\"],\"emergency\":[\"<chiffres>\"]}. Exemple attendu: {\"vat_percent\":\"20%\",\"plug\":[\"E\",\"F\"],\"emergency\":[\"112\",\"15\",\"17\",\"18\"]}"
+}
+```
+
 ## Future Improvements
 
 1. **Alternate Language Support**: For CH, alternate between German and French
