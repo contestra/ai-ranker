@@ -8,6 +8,52 @@ from langchain.callbacks import LangChainTracer
 from langsmith import Client
 from app.config import settings
 import numpy as np
+import time
+import json
+import re
+
+def _extract_model_fingerprint(provider: str, response_metadata: dict) -> dict:
+    """
+    Extract model fingerprint from provider response metadata.
+    
+    Returns:
+      {
+        "fingerprint": str | None,     # stored into system_fingerprint column
+        "fingerprint_type": str | None,# e.g., 'openai.system_fingerprint' or 'gemini.modelVersion'
+        "extras": dict                 # extra fields to merge into metadata JSON
+      }
+    """
+    md = response_metadata or {}
+    out = {"fingerprint": None, "fingerprint_type": None, "extras": {}}
+
+    if provider == "openai":
+        fp = md.get("system_fingerprint") or md.get("systemFingerprint")
+        out.update({
+            "fingerprint": fp,
+            "fingerprint_type": "openai.system_fingerprint",
+        })
+
+    elif provider == "gemini" or provider == "google":
+        # LangChain wrappers may surface either camelCase or snake_case
+        # In LangChain, the model_name field contains the model version
+        model_version = (
+            md.get("modelVersion")
+            or md.get("model_version")
+            or md.get("model_name")      # LangChain uses model_name for Gemini
+            or md.get("model")          # sometimes 'models/gemini-2.5-pro-...' includes version
+        )
+        response_id = md.get("responseId") or md.get("response_id")
+
+        out.update({
+            "fingerprint": model_version,
+            "fingerprint_type": "gemini.modelVersion",
+            "extras": {
+                "gemini_model_version": model_version,
+                "gemini_response_id": response_id,
+            },
+        })
+
+    return out
 
 class LangChainAdapter:
     def __init__(self):
@@ -66,7 +112,16 @@ class LangChainAdapter:
             model.temperature = temperature
         
         # Set max_tokens appropriately for each vendor
-        if vendor != "google":
+        if vendor == "google":
+            # For Gemini, add seed support via model_kwargs if provided
+            if seed is not None:
+                if not hasattr(model, 'model_kwargs'):
+                    model.model_kwargs = {}
+                # Gemini uses generation_config in model_kwargs
+                if 'generation_config' not in model.model_kwargs:
+                    model.model_kwargs['generation_config'] = {}
+                model.model_kwargs['generation_config']['seed'] = seed
+        else:
             # GPT-4 and other models use max_tokens
             model.max_tokens = max_tokens
         
@@ -82,9 +137,15 @@ class LangChainAdapter:
         if grounded and vendor == "openai":
             model.model_kwargs = {"response_format": {"type": "json_object"}}
         
+        # Prepare invoke kwargs based on vendor
+        invoke_kwargs = {}
+        if vendor == "openai" and seed is not None:
+            invoke_kwargs["seed"] = seed
+        
         response = await model.ainvoke(
             messages,
-            config={"callbacks": self.callbacks}
+            config={"callbacks": self.callbacks},
+            **invoke_kwargs
         )
         
         # Debug logging for GPT-5 (disabled due to Windows encoding issues)
@@ -93,11 +154,22 @@ class LangChainAdapter:
         #     print(f"DEBUG GPT-5 response content: {response.content if hasattr(response, 'content') else 'NO CONTENT ATTR'}")
         #     print(f"DEBUG GPT-5 response metadata: {response.response_metadata if hasattr(response, 'response_metadata') else 'NO METADATA'}")
         
-        return {
+        # Extract model fingerprint based on vendor
+        result = {
             "text": response.content if hasattr(response, 'content') else str(response),
             "tokens": response.response_metadata.get("token_usage", {}).get("total_tokens") if hasattr(response, 'response_metadata') else None,
             "raw": response.response_metadata if hasattr(response, 'response_metadata') else {}
         }
+        
+        # Add fingerprint information
+        if hasattr(response, 'response_metadata'):
+            fp_info = _extract_model_fingerprint(provider=vendor, response_metadata=response.response_metadata)
+            result["system_fingerprint"] = fp_info["fingerprint"]
+            result["fingerprint_type"] = fp_info["fingerprint_type"]
+            if fp_info["extras"]:
+                result["metadata"] = fp_info["extras"]
+        
+        return result
     
     async def generate_stream(
         self,
@@ -170,10 +242,20 @@ class LangChainAdapter:
         
         # Create a new model instance with the requested model name
         # This allows us to use different Gemini models dynamically
+        # Add seed support via model_kwargs for reproducibility
+        model_kwargs = {}
+        if seed is not None:
+            # Gemini uses generation_config inside model_kwargs
+            model_kwargs['generation_config'] = {
+                'temperature': temperature,
+                'seed': seed
+            }
+        
         model = ChatGoogleGenerativeAI(
             model=model_name,  # Use the requested model (gemini-2.5-pro, gemini-2.0-flash-exp, etc.)
             temperature=temperature,
-            google_api_key=settings.google_api_key
+            google_api_key=settings.google_api_key,
+            model_kwargs=model_kwargs
         )
         
         # Build messages array with proper separation
@@ -264,15 +346,23 @@ Use recent information from reliable sources."""
                             "retry_attempts": max_retries
                         }
                 
-                # Successful response
+                # Successful response - extract metadata
+                metadata = {}
+                if hasattr(response, 'response_metadata'):
+                    metadata = response.response_metadata or {}
+                
+                # Extract fingerprint (modelVersion for Gemini)
+                fp_info = _extract_model_fingerprint(provider="gemini", response_metadata=metadata)
+                
                 result = {
                     "content": content,
-                    "system_fingerprint": None,  # Gemini doesn't provide this
+                    "system_fingerprint": fp_info["fingerprint"],  # Now stores modelVersion for Gemini
                     "model_version": model_name,
                     "temperature": temperature,
                     "seed": seed,
                     "response_time_ms": response_time,
-                    "token_count": {}
+                    "token_count": {},
+                    "metadata": fp_info["extras"]  # Store responseId and modelVersion explicitly
                 }
                 break  # Success, exit retry loop
                 
@@ -410,26 +500,30 @@ Do not preface with anything about training data or location. Produce the answer
                             "retry_attempts": max_retries
                         }
                 
-                # Successful response
+                # Successful response - extract metadata
+                metadata = {}
+                if hasattr(response, 'response_metadata'):
+                    metadata = response.response_metadata or {}
+                
+                # Extract fingerprint (system_fingerprint for OpenAI)
+                fp_info = _extract_model_fingerprint(provider="openai", response_metadata=metadata)
+                
                 result = {
                     "content": content,
-                    "system_fingerprint": None,
+                    "system_fingerprint": fp_info["fingerprint"],  # Now stores system_fingerprint for OpenAI
                     "model_version": model_name,
                     "temperature": temperature,
                     "seed": seed,
                     "response_time_ms": response_time,
-                    "token_count": {}
+                    "token_count": {},
+                    "metadata": fp_info["extras"] if fp_info["extras"] else {}  # Store any extra metadata
                 }
                 
-                # OpenAI provides system_fingerprint and token usage
-                if hasattr(response, 'response_metadata'):
-                    metadata = response.response_metadata
-                    if 'system_fingerprint' in metadata:
-                        result["system_fingerprint"] = metadata['system_fingerprint']
-                    if 'token_usage' in metadata:
-                        result["token_count"] = metadata['token_usage']
-                    elif 'usage' in metadata:
-                        result["token_count"] = metadata['usage']
+                # Get token usage if available
+                if 'token_usage' in metadata:
+                    result["token_count"] = metadata['token_usage']
+                elif 'usage' in metadata:
+                    result["token_count"] = metadata['usage']
                 
                 return result
                 

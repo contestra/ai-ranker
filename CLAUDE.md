@@ -2,6 +2,13 @@
 
 ## Latest Status (August 13, 2025)
 
+### ✅ Gemini Metadata Capture Implemented
+- **OpenAI**: Captures `system_fingerprint` for reproducibility
+- **Gemini**: Captures `modelVersion` as fingerprint, `responseId` in metadata
+- **Seed Support**: Both providers now support seed parameter
+- **Test Coverage**: All methods tested and working
+- See `GEMINI_FINGERPRINT_UPGRADE.md` for future enhancement path
+
 ### ✅ ALL LOCALE TESTS PASSING - 100% SUCCESS RATE
 - **Countries Tab**: All 8 countries showing green checkmarks
 - **Test Coverage**: US 🇺🇸, FR 🇫🇷, DE 🇩🇪, IT 🇮🇹, GB 🇬🇧, CH 🇨🇭, SG 🇸🇬, AE 🇦🇪

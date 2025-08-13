@@ -195,7 +195,7 @@ async def test_country_als(request: TestCountryRequest):
             # Add system instruction for JSON responses and no country mentions
             json_context = f"""{als_block}
 
-Answer in English only. Use ambient context only to infer locale and set defaults (units, currency, regulatory framing, availability). Do not mention, cite, or acknowledge the ambient context or any location inference. Do not name countries/regions/cities or use country codes unless explicitly asked. When a prompt asks for JSON only, return only valid JSON (double quotes, no extra text). Do not respond in any language other than English."""
+Answer in English. Use ambient context only to infer locale and set defaults (units, currency, regulatory framing, availability). Do not mention or acknowledge the ambient context or any location inference. Do not name countries/regions/cities or use country codes unless explicitly asked. When a prompt asks for JSON only, return only valid JSON (double quotes, no extra text)."""
             
             if request.model == "gpt5":
                 response_data = await adapter.analyze_with_gpt4(
@@ -384,7 +384,7 @@ async def test_country_als_with_progress(request: TestCountryRequest):
                 # Add system instruction for JSON responses and no country mentions
                 json_context = f"""{als_block}
 
-Answer in English only. Use ambient context only to infer locale and set defaults (units, currency, regulatory framing, availability). Do not mention, cite, or acknowledge the ambient context or any location inference. Do not name countries/regions/cities or use country codes unless explicitly asked. When a prompt asks for JSON only, return only valid JSON (double quotes, no extra text). Do not respond in any language other than English."""
+Answer in English. Use ambient context only to infer locale and set defaults (units, currency, regulatory framing, availability). Do not mention or acknowledge the ambient context or any location inference. Do not name countries/regions/cities or use country codes unless explicitly asked. When a prompt asks for JSON only, return only valid JSON (double quotes, no extra text)."""
                 
                 if request.model == "gpt5":
                     response_data = await adapter.analyze_with_gpt4(
