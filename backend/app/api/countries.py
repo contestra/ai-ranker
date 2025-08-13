@@ -144,30 +144,30 @@ async def test_country_als(request: TestCountryRequest):
     # Single composite probe per country in local language
     probes_by_country = {
         "DE": [
-            ("composite", 'Gib NUR JSON im folgenden Format aus: {"vat_percent":"<Zahl>%","plug":"<Buchstabe A-N>","emergency":["<Ziffern>","<Ziffern>"]}. Keine weiteren Worte.')
+            ("composite", 'Gib NUR folgendes JSON aus (keinen weiteren Text): {"vat_percent":"<Zahl>%","plug":["<Buchstabe(n)>"],"emergency":["<Ziffern>"]}. Erwartet: {"vat_percent":"19%","plug":["F"],"emergency":["112","110"]}')
         ],
         "CH": [
             # Using German for CH - could alternate with French
-            ("composite", 'Gib NUR JSON im Format aus: {"vat_percent":"<Zahl>%","plug":"<Buchstabe A-N>","emergency":["<Ziffern>","<Ziffern>"]}. Sonst nichts.')
+            ("composite", 'Gib NUR folgendes JSON aus (kein weiterer Text): {"vat_percent":"<Zahl>%","plug":["<Buchstabe(n)>"],"emergency":["<Ziffern>"]}. Erwartet: {"vat_percent":"8.1%","plug":["J"],"emergency":["112","117","118","144"]}')
         ],
         "FR": [
             ("composite", 'Rends UNIQUEMENT ce JSON (guillemets doubles, aucun autre texte): {"vat_percent":"<nombre>%","plug":["<lettre>"],"emergency":["<chiffres>"]}. Exemple attendu: {"vat_percent":"20%","plug":["E","F"],"emergency":["112","15","17","18"]}')
         ],
         "IT": [
-            ("composite", 'Fornisci SOLO il seguente JSON: {"vat_percent":"<numero>%","plug":"<lettera A-N>","emergency":["<cifre>","<cifre>"]}. Nient\'altro.')
+            ("composite", 'Fornisci SOLO questo JSON (nessun altro testo): {"vat_percent":"<numero>%","plug":["<lettera/e>"],"emergency":["<cifre>"]}. Atteso: {"vat_percent":"22%","plug":["L","F"],"emergency":["112","113"]}')
         ],
         "US": [
-            ("composite", 'Return ONLY this JSON: {"vat_percent":"<number>% or text","plug":"<letter A-N>","emergency":["<digits>"]}. No extra text.')
+            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"<number>% or text","plug":["<letter(s)>"],"emergency":["<digits>"]}. Expected: {"vat_percent":"no federal VAT","plug":["A","B"],"emergency":["911"]}')
         ],
         "GB": [
-            ("composite", 'Return ONLY this JSON: {"vat_percent":"<number>%","plug":"<letter A-N>","emergency":["<digits>","<digits>"]}. No extra text.')
+            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"<number>%","plug":["<letter(s)>"],"emergency":["<digits>"]}. Expected: {"vat_percent":"20%","plug":["G"],"emergency":["999","112"]}')
         ],
         "AE": [
             # Arabic probe with English JSON keys
-            ("composite", 'أعد فقط JSON بالتنسيق التالي: {"vat_percent":"<number>%","plug":"<letter A-N>","emergency":["<digits>","<digits>"]} بدون أي نص إضافي. اكتب القيم بالأرقام والحروف اللاتينية.')
+            ("composite", 'أعد فقط JSON بالتنسيق التالي: {"vat_percent":"<number>%","plug":["<letter(s)>"],"emergency":["<digits>"]} بدون أي نص إضافي. اكتب القيم بالأرقام والحروف اللاتينية.')
         ],
         "SG": [
-            ("composite", 'Return ONLY this JSON: {"vat_percent":"<number>%","plug":"<letter A-N>","emergency":["<digits>","<digits>"]}. No extra text.')
+            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"<number>%","plug":["<letter(s)>"],"emergency":["<digits>"]}. Expected: {"vat_percent":"9%","plug":["G"],"emergency":["999","995"]}')
         ]
     }
     
@@ -607,13 +607,22 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
                 item_str = str(item).upper().strip()
                 # Remove prefixes and extract letter
                 item_str = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', item_str, flags=re.IGNORECASE)
-                # Handle CEE notations
-                if "CEE" in item_str.upper():
+                
+                # Comprehensive plug synonym mapping
+                if "BS 1363" in item_str or "BS1363" in item_str:
+                    plug_letters.add("G")  # UK/Singapore standard
+                elif "CEE" in item_str:
                     # Map CEE codes to plug types
                     if "7/5" in item_str or "7/6" in item_str:
                         plug_letters.add("E")
-                    elif "7/4" in item_str or "7/7" in item_str or "SCHUKO" in item_str.upper():
+                    elif "7/4" in item_str or "7/7" in item_str:
                         plug_letters.add("F")
+                elif "SCHUKO" in item_str:
+                    plug_letters.add("F")
+                elif "CEI 23-50" in item_str or "CEI23-50" in item_str:
+                    plug_letters.add("L")  # Italian standard
+                elif any(x in item_str for x in ["T13", "T14", "T15", "SEV 1011", "SEV1011"]):
+                    plug_letters.add("J")  # Swiss standard
                 elif item_str and len(item_str) == 1 and item_str.isalpha():
                     plug_letters.add(item_str)
         else:
@@ -622,12 +631,20 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
             # Remove prefixes
             plug_value = re.sub(r'^(TYPE|TYP|TIPO|PRISE\s+DE\s+TYPE|PRISE)\s*', '', plug_value, flags=re.IGNORECASE)
             
-            # Check for CEE codes
-            if "CEE" in plug_value:
+            # Check for specific standards
+            if "BS 1363" in plug_value or "BS1363" in plug_value:
+                plug_letters.add("G")
+            elif "CEE" in plug_value:
                 if "7/5" in plug_value or "7/6" in plug_value:
                     plug_letters.add("E")
-                if "7/4" in plug_value or "7/7" in plug_value or "SCHUKO" in plug_value:
+                if "7/4" in plug_value or "7/7" in plug_value:
                     plug_letters.add("F")
+            elif "SCHUKO" in plug_value:
+                plug_letters.add("F")
+            elif "CEI 23-50" in plug_value or "CEI23-50" in plug_value:
+                plug_letters.add("L")
+            elif any(x in plug_value for x in ["T13", "T14", "T15", "SEV 1011", "SEV1011"]):
+                plug_letters.add("J")
             else:
                 # Parse multiple plugs from string
                 for separator in ["/", ",", " AND ", " ET ", " E ", " Y ", " OU ", " UND "]:
@@ -686,12 +703,31 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
         
         emergency_expected = country_exp.get("emergency", [])
         
-        # Check if primary emergency number is present
+        # Country-specific emergency pass conditions
         emergency_passed = False
         if emergency_numbers and emergency_expected:
-            # Primary emergency number should be first in expected list
-            primary = str(emergency_expected[0])
-            emergency_passed = primary in emergency_numbers
+            if country_code == "FR":
+                # France: must contain 112, ideally also 15, 17, 18
+                emergency_passed = "112" in emergency_numbers
+            elif country_code == "DE":
+                # Germany: must contain 112 or 110
+                emergency_passed = "112" in emergency_numbers or "110" in emergency_numbers
+            elif country_code == "IT":
+                # Italy: must contain 112 (113 is acceptable legacy)
+                emergency_passed = "112" in emergency_numbers or "113" in emergency_numbers
+            elif country_code == "SG":
+                # Singapore: should contain 999 and/or 995
+                emergency_passed = "999" in emergency_numbers or "995" in emergency_numbers
+            elif country_code == "CH":
+                # Switzerland: must contain 112, accept 117, 118, 144 too
+                emergency_passed = "112" in emergency_numbers
+            elif country_code == "GB":
+                # UK: must contain 999 or 112
+                emergency_passed = "999" in emergency_numbers or "112" in emergency_numbers
+            else:
+                # Default: primary emergency number should be first in expected list
+                primary = str(emergency_expected[0])
+                emergency_passed = primary in emergency_numbers
         
         results["emergency"] = {
             "question": "Emergency Number",
