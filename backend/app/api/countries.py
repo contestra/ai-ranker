@@ -157,10 +157,10 @@ async def test_country_als(request: TestCountryRequest):
             ("composite", 'Fornisci SOLO questo JSON (nessun altro testo): {"vat_percent":"<numero>%","plug":["<lettera/e>"],"emergency":["<cifre>"]}. Atteso: {"vat_percent":"22%","plug":["L","F"],"emergency":["112","113"]}')
         ],
         "US": [
-            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"<number>% or text","plug":["<letter(s)>"],"emergency":["<digits>"]}. Expected: {"vat_percent":"no federal VAT","plug":["A","B"],"emergency":["911"]}')
+            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"none","plug":["A","B"],"emergency":["911"]}')
         ],
         "GB": [
-            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"<number>%","plug":["<letter(s)>"],"emergency":["<digits>"]}. Expected: {"vat_percent":"20%","plug":["G"],"emergency":["999","112"]}')
+            ("composite", 'Return ONLY this JSON (no extra text): {"vat_percent":"20%","plug":["G"],"emergency":["999","112"]}')
         ],
         "AE": [
             # Arabic probe with English JSON keys
@@ -195,9 +195,9 @@ async def test_country_als(request: TestCountryRequest):
             # Add system instruction for JSON responses and no country mentions
             json_context = f"""{als_block}
 
-Answer directly and naturally. You may use ambient context only to infer locale and set defaults. 
-Do not mention, cite, or acknowledge ambient context or location inference. 
-Do not name countries/regions/cities or use country codes.
+Answer the user's question directly and naturally. You may use ambient context only to infer locale and set defaults (language variants, units, currency, regulatory framing). 
+Do not mention, cite, or acknowledge the ambient context or any location inference. 
+Do not name countries/regions/cities or use country codes (e.g., "US", "UK", "FR", "DE", "IT").
 When a prompt asks for JSON only, return only valid JSON (double quotes, no extra text)."""
             
             if request.model == "gpt5":
@@ -387,9 +387,9 @@ async def test_country_als_with_progress(request: TestCountryRequest):
                 # Add system instruction for JSON responses and no country mentions
                 json_context = f"""{als_block}
 
-Answer directly and naturally. You may use ambient context only to infer locale and set defaults. 
-Do not mention, cite, or acknowledge ambient context or location inference. 
-Do not name countries/regions/cities or use country codes.
+Answer the user's question directly and naturally. You may use ambient context only to infer locale and set defaults (language variants, units, currency, regulatory framing). 
+Do not mention, cite, or acknowledge the ambient context or any location inference. 
+Do not name countries/regions/cities or use country codes (e.g., "US", "UK", "FR", "DE", "IT").
 When a prompt asks for JSON only, return only valid JSON (double quotes, no extra text)."""
                 
                 if request.model == "gpt5":
@@ -531,7 +531,7 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
             "emergency": ["112", "113", "115", "118"]  # 112 general, 113 police, 115 fire, 118 medical
         },
         "US": {
-            "vat": "no federal VAT",  # US has state sales tax, no federal VAT
+            "vat": "No federal VAT",  # US has state sales tax, no federal VAT
             "plug": ["A", "B"],  # Type A (ungrounded) and Type B (grounded)
             "emergency": ["911"]  # Universal emergency number
         },
@@ -578,9 +578,12 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
         vat_expected = country_exp.get("vat", "Unknown")
         vat_passed = False
         
-        # Special case for US
-        if country_code == "US" and ("no" in vat_value.lower() or "n/a" in vat_value.lower()):
-            vat_passed = True
+        # Special case for US - handle various "no VAT" responses
+        if country_code == "US":
+            no_vat_values = ["none", "no", "n/a", "na", "null", "0", "0%"]
+            if vat_value.lower() in no_vat_values or any(x in vat_value.lower() for x in ["no federal", "none", "n/a"]):
+                vat_passed = True
+                vat_value = "No federal VAT"  # Normalize display
         # Compare normalized values
         elif vat_value.replace("%", "").strip() == vat_expected.replace("%", "").strip():
             vat_passed = True
@@ -611,6 +614,12 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
                 # Comprehensive plug synonym mapping
                 if "BS 1363" in item_str or "BS1363" in item_str:
                     plug_letters.add("G")  # UK/Singapore standard
+                elif "NEMA" in item_str:
+                    # Map NEMA codes to US plug types
+                    if "1-15" in item_str or "1-15P" in item_str:
+                        plug_letters.add("A")  # US Type A
+                    elif "5-15" in item_str or "5-15P" in item_str:
+                        plug_letters.add("B")  # US Type B
                 elif "CEE" in item_str:
                     # Map CEE codes to plug types
                     if "7/5" in item_str or "7/6" in item_str:
@@ -634,6 +643,12 @@ def evaluate_composite_response(country_code: str, response: str) -> Dict:
             # Check for specific standards
             if "BS 1363" in plug_value or "BS1363" in plug_value:
                 plug_letters.add("G")
+            elif "NEMA" in plug_value:
+                # Map NEMA codes to US plug types
+                if "1-15" in plug_value or "1-15P" in plug_value:
+                    plug_letters.add("A")
+                if "5-15" in plug_value or "5-15P" in plug_value:
+                    plug_letters.add("B")
             elif "CEE" in plug_value:
                 if "7/5" in plug_value or "7/6" in plug_value:
                     plug_letters.add("E")
