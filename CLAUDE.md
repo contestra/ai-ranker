@@ -1,6 +1,32 @@
 # CLAUDE.md - AI Rank & Influence Tracker
 
-## Latest Status (August 13, 2025)
+## Latest Status (August 14, 2025)
+
+### 🚀 Prompter V4 Implementation Ready - Production Hardened
+**Status**: Specification complete with all production fixes
+**Files**:
+- `FINAL_PROMPTER_UPGRADE_PROMPT_V4.md` - Production-ready spec with critical fixes
+- `PROMPTER_INTEGRATION_PLAN.md` - Step-by-step integration guide
+- `SYSTEM_INTEGRITY_RULES.md` - Mandatory feature isolation rules
+
+**V4 Critical Fixes (from external review)**:
+1. ✅ **SQLite CASCADE removed** - Not supported in SQLite
+2. ✅ **UUID string parity** - Both SQLite/PostgreSQL use UUID strings (not mixed int/UUID)
+3. ✅ **Partial index for soft-delete** - Proper unique constraint with `WHERE deleted_at IS NULL`
+4. ✅ **Service layer** - Prevents route recursion with `PromptVersionService`
+5. ✅ **Defined variables** - All result fields properly populated
+6. ✅ **Column clarity** - `rendered_prompt_hash`, `run_country`, `used_grounding`
+7. ✅ **Concurrent handling** - Parallel creates return exactly one success
+8. ✅ **JSON consistency** - SQLite TEXT fields handled properly
+
+**Architecture Highlights**:
+- Multi-brand support via `workspace_id` (references brands table)
+- Config hash excludes aliases and workspace (pure generation config)
+- Version tracking per provider fingerprint
+- Full audit trail with `analysis_config` for future alias support
+- Templates deduplicated by `(org_id, workspace_id, config_hash)`
+
+## Previous Status (August 13, 2025)
 
 ### ✅ Gemini Metadata Capture Implemented
 - **OpenAI**: Captures `system_fingerprint` for reproducibility
