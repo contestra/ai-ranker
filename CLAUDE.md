@@ -2,22 +2,30 @@
 
 ## Latest Status (August 14, 2025)
 
-### 🚀 Prompter V4 Implementation Ready - Production Hardened
-**Status**: Specification complete with all production fixes
-**Files**:
-- `FINAL_PROMPTER_UPGRADE_PROMPT_V4.md` - Production-ready spec with critical fixes
+### 🚀 Prompter V7 FINAL - Production-Ready Implementation
+**Status**: FINAL specification with ALL fixes applied, ready for immediate implementation
+**Implementation Files**:
+- `FINAL_PROMPTER_UPGRADE_PROMPT_V7.md` - **FINAL production-ready spec** (USE THIS)
+- `prompter_router_min.py` - **Complete working starter router** (drop-in ready!)
+- `PROMPTER_V7_STARTER_ROUTER.md` - Documentation for the starter router
+- `PROMPTER_V6_ROLLOUT_CHECKLIST.md` - Complete deployment guide with smoke tests
+- `PROMPTER_V4_PRODUCTION_COMPONENTS.md` - Drop-in implementation modules
 - `PROMPTER_INTEGRATION_PLAN.md` - Step-by-step integration guide
 - `SYSTEM_INTEGRITY_RULES.md` - Mandatory feature isolation rules
 
-**V4 Critical Fixes (from external review)**:
-1. ✅ **SQLite CASCADE removed** - Not supported in SQLite
-2. ✅ **UUID string parity** - Both SQLite/PostgreSQL use UUID strings (not mixed int/UUID)
-3. ✅ **Partial index for soft-delete** - Proper unique constraint with `WHERE deleted_at IS NULL`
-4. ✅ **Service layer** - Prevents route recursion with `PromptVersionService`
-5. ✅ **Defined variables** - All result fields properly populated
-6. ✅ **Column clarity** - `rendered_prompt_hash`, `run_country`, `used_grounding`
-7. ✅ **Concurrent handling** - Parallel creates return exactly one success
-8. ✅ **JSON consistency** - SQLite TEXT fields handled properly
+**V7 FINAL Fixes (production-ready)**:
+1. ✅ **Request models defined** - `CreateTemplateRequest` and `RunTemplateRequest` included
+2. ✅ **Endpoint paths flattened** - Fixed double-path issue (`/api/prompt-templates/templates`)
+3. ✅ **SQLite detection bulletproof** - Returns strict boolean, no None
+4. ✅ **Provider version consistency** - Result key matches version row, no disagreement
+5. ✅ **Fingerprint extraction complete** - Handles Anthropic model_id explicitly
+6. ✅ **Redis idempotency restored** - Optional probe guard prevents thundering herd
+7. ✅ **Async/sync safety** - `inspect.isawaitable()` guards adapter calls
+8. ✅ **Pydantic tolerance** - Handles both dict and Pydantic `inference_params`
+9. ✅ **Provider inference robust** - Handles o3, o4, omni-* modern models
+10. ✅ **All imports included** - No missing dependencies
+11. ✅ **Idempotent indexes** - All use `IF NOT EXISTS`
+12. ✅ **Complete implementation** - Ready to copy-paste and run
 
 **Architecture Highlights**:
 - Multi-brand support via `workspace_id` (references brands table)
