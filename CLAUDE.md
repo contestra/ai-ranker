@@ -515,10 +515,13 @@ if response.ok:
 - `PROMPTER_V7_OBSERVABILITY_DASHBOARDS.md` - Grafana and DataDog monitoring dashboards
 - `PROMPTER_V7_PROMETHEUS_METRICS.md` - Prometheus metrics module documentation
 - `PROMPTER_V7_ROUTER_WITH_METRICS.md` - Updated router with integrated metrics
+- `PROMPTER_V7_INSTRUMENTED_SERVICE_LAYER.md` - Service layer with probe metrics
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
 - `prompter_router_min v2.py` - Updated router with integrated Prometheus metrics
+- `prompt_versions.py` - Instrumented ensure-version service with probe metrics
+- `provider_probe.py` - Stubbed provider probe for development
 - `conftest.py` - Pytest configuration with mocked provider probes
 - `test_prompter_router_min.py` - End-to-end tests for all endpoints
 - `v7_prompt_upgrade_20250814141329.py` - Alembic migration for PostgreSQL
