@@ -517,10 +517,12 @@ if response.ok:
 - `PROMPTER_V7_PROMETHEUS_METRICS.md` - Prometheus metrics module documentation
 - `PROMPTER_V7_ROUTER_WITH_METRICS.md` - Updated router with integrated metrics
 - `PROMPTER_V7_INSTRUMENTED_SERVICE_LAYER.md` - Service layer with probe metrics
+- `PROMPTER_V7_FAKE_LLM_INTEGRATION.md` - Fake LLM for complete local testing
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
-- `prompter_router_min v2.py` - Updated router with integrated Prometheus metrics
+- `prompter_router_min v2.py` - Router with integrated Prometheus metrics
+- `prompter_router_min_v3.py` - **LATEST** - Router with metrics + fake LLM integration
 - `prompt_versions.py` - Instrumented ensure-version service with probe metrics
 - `provider_probe.py` - Stubbed provider probe for development
 - `conftest.py` - Pytest configuration with mocked provider probes
