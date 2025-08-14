@@ -505,6 +505,19 @@ if response.ok:
 - `DE_LEAK_INVESTIGATION.md` - Investigation of "DE" leak in Ambient Blocks
 - `LEAK_PREVENTION_FIXES.md` - Fixes applied to prevent location disclosure
 
+### Prompter V7 Documentation
+- `FINAL_PROMPTER_UPGRADE_PROMPT_V7.md` - Complete V7 specification with all fixes
+- `PROMPTER_V6_ROLLOUT_CHECKLIST.md` - Comprehensive deployment checklist
+- `PROMPTER_V7_STARTER_ROUTER.md` - Documentation for starter router implementation
+- `PROMPTER_V7_TEST_SUITE.md` - Complete pytest test coverage documentation
+- `PROMPTER_V7_ALEMBIC_MIGRATION.md` - PostgreSQL database migration guide
+
+### Prompter V7 Implementation Files
+- `prompter_router_min.py` - Complete working FastAPI router implementation
+- `conftest.py` - Pytest configuration with mocked provider probes
+- `test_prompter_router_min.py` - End-to-end tests for all endpoints
+- `v7_prompt_upgrade_20250814141329.py` - Alembic migration for PostgreSQL
+
 ## Deployment
 
 Deploy to Fly.io:
