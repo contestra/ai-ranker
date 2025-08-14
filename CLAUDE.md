@@ -511,12 +511,17 @@ if response.ok:
 - `PROMPTER_V7_STARTER_ROUTER.md` - Documentation for starter router implementation
 - `PROMPTER_V7_TEST_SUITE.md` - Complete pytest test coverage documentation
 - `PROMPTER_V7_ALEMBIC_MIGRATION.md` - PostgreSQL database migration guide
+- `PROMPTER_V7_TESTING_AND_SQLITE_PARITY.md` - Testing infrastructure and SQLite dev support
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
 - `conftest.py` - Pytest configuration with mocked provider probes
 - `test_prompter_router_min.py` - End-to-end tests for all endpoints
 - `v7_prompt_upgrade_20250814141329.py` - Alembic migration for PostgreSQL
+- `test_alembic_v7_migration.py` - PostgreSQL migration round-trip test
+- `sqlite_v7_parity.sql` - SQLite schema for development parity
+- `apply_sqlite_v7.py` - Script to apply SQLite schema
+- `test_sqlite_v7_parity.py` - SQLite schema verification test
 
 ## Deployment
 
