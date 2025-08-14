@@ -4,11 +4,16 @@
 
 ### 🚀 Prompter V7 FINAL - Production-Ready Implementation
 **Status**: FINAL specification with ALL fixes applied, ready for immediate implementation
+
 **Implementation Files**:
 - `FINAL_PROMPTER_UPGRADE_PROMPT_V7.md` - **FINAL production-ready spec** (USE THIS)
 - `prompter_router_min.py` - **Complete working starter router** (drop-in ready!)
-- `PROMPTER_V7_STARTER_ROUTER.md` - Documentation for the starter router
-- `PROMPTER_V6_ROLLOUT_CHECKLIST.md` - Complete deployment guide with smoke tests
+- `conftest.py` + `test_prompter_router_min.py` - **Complete test suite** (all green!)
+
+**Documentation**:
+- `PROMPTER_V7_STARTER_ROUTER.md` - How to use the starter router
+- `PROMPTER_V7_TEST_SUITE.md` - Test suite documentation
+- `PROMPTER_V6_ROLLOUT_CHECKLIST.md` - Complete deployment guide
 - `PROMPTER_V4_PRODUCTION_COMPONENTS.md` - Drop-in implementation modules
 - `PROMPTER_INTEGRATION_PLAN.md` - Step-by-step integration guide
 - `SYSTEM_INTEGRITY_RULES.md` - Mandatory feature isolation rules
