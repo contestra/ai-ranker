@@ -506,7 +506,8 @@ if response.ok:
 - `LEAK_PREVENTION_FIXES.md` - Fixes applied to prevent location disclosure
 
 ### Prompter V7 Documentation
-- `PROMPTER_V7_COMPLETE_SOLUTION_SUMMARY.md` - 🎯 **START HERE** - Complete solution overview
+- `PROMPTER_V7_FINAL_COMPLETE.md` - 🏆 **START HERE** - The definitive solution summary
+- `PROMPTER_V7_COMPLETE_SOLUTION_SUMMARY.md` - Complete solution overview
 - `FINAL_PROMPTER_UPGRADE_PROMPT_V7.md` - Complete V7 specification with all fixes
 - `PROMPTER_V6_ROLLOUT_CHECKLIST.md` - Comprehensive deployment checklist
 - `PROMPTER_V7_STARTER_ROUTER.md` - Documentation for starter router implementation
@@ -519,6 +520,7 @@ if response.ok:
 - `PROMPTER_V7_INSTRUMENTED_SERVICE_LAYER.md` - Service layer with probe metrics
 - `PROMPTER_V7_FAKE_LLM_INTEGRATION.md` - Fake LLM for complete local testing
 - `PROMPTER_V7_FINAL_TEST_ENHANCEMENTS.md` - Enhanced tests with fingerprint validation
+- `PROMPTER_V7_DEVELOPER_TOOLS.md` - Makefile and development automation
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
@@ -529,6 +531,9 @@ if response.ok:
 - `conftest.py` - Pytest configuration with mocked provider probes
 - `test_prompter_router_min.py` - End-to-end tests for all endpoints
 - `test_prompter_router_min_v2.py` - Enhanced tests with fingerprint and metrics validation
+- `test_metrics_smoke.py` - Prometheus endpoint smoke test
+- `requirements-dev.txt` - All development dependencies
+- `Makefile` - Developer automation and convenience commands
 - `v7_prompt_upgrade_20250814141329.py` - Alembic migration for PostgreSQL
 - `test_alembic_v7_migration.py` - PostgreSQL migration round-trip test
 - `sqlite_v7_parity.sql` - SQLite schema for development parity
