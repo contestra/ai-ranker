@@ -512,6 +512,7 @@ if response.ok:
 - `PROMPTER_V7_TEST_SUITE.md` - Complete pytest test coverage documentation
 - `PROMPTER_V7_ALEMBIC_MIGRATION.md` - PostgreSQL database migration guide
 - `PROMPTER_V7_TESTING_AND_SQLITE_PARITY.md` - Testing infrastructure and SQLite dev support
+- `PROMPTER_V7_OBSERVABILITY_DASHBOARDS.md` - Grafana and DataDog monitoring dashboards
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
@@ -522,6 +523,11 @@ if response.ok:
 - `sqlite_v7_parity.sql` - SQLite schema for development parity
 - `apply_sqlite_v7.py` - Script to apply SQLite schema
 - `test_sqlite_v7_parity.py` - SQLite schema verification test
+
+### Prompter V7 Observability
+- `grafana_prompter_rollout_dashboard.json` - Grafana dashboard for Prometheus metrics
+- `datadog_prompter_rollout_dashboard.json` - DataDog dashboard configuration
+- `observability_readme.md` - Quick setup guide for monitoring
 
 ## Deployment
 

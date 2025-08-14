@@ -1,0 +1,290 @@
+{
+  "title": "Prompter V7 Rollout (API + Probes + Results)",
+  "description": "Starter dashboard for monitoring API health, probes, workers, DB, and results. Replace metric names if your integration differs.",
+  "widgets": [
+    {
+      "definition": {
+        "type": "query_value",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "query1"
+              }
+            ],
+            "queries": [
+              {
+                "name": "query1",
+                "data_source": "metrics",
+                "query": "sum:prompter.http.requests{service:$svc,env:$env}.rollup(rate,60)"
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ],
+        "title": "API req/s"
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "4xx %",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "100 * (req4xx / req_all)"
+              }
+            ],
+            "queries": [
+              {
+                "name": "req4xx",
+                "data_source": "metrics",
+                "query": "sum:prompter.http.status.4xx{service:$svc,env:$env}.rollup(sum,300)"
+              },
+              {
+                "name": "req_all",
+                "data_source": "metrics",
+                "query": "sum:prompter.http.requests{service:$svc,env:$env}.rollup(sum,300)"
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ],
+        "precision": 2
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "5xx %",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "100 * (req5xx / req_all)"
+              }
+            ],
+            "queries": [
+              {
+                "name": "req5xx",
+                "data_source": "metrics",
+                "query": "sum:prompter.http.status.5xx{service:$svc,env:$env}.rollup(sum,300)"
+              },
+              {
+                "name": "req_all",
+                "data_source": "metrics",
+                "query": "sum:prompter.http.requests{service:$svc,env:$env}.rollup(sum,300)"
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ],
+        "precision": 2
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "API p95 latency (ms)",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "p95(lat)"
+              }
+            ],
+            "queries": [
+              {
+                "name": "lat",
+                "data_source": "metrics",
+                "query": "distribution:prompter.http.latency{service:$svc,env:$env}.rollup(p95,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ],
+        "show_legend": true
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Probe success rate (%)",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "100 * (1 - (fail/attempts))"
+              }
+            ],
+            "queries": [
+              {
+                "name": "attempts",
+                "data_source": "metrics",
+                "query": "sum:prompter.probe.attempts{service:$svc,env:$env}.rollup(rate,60)"
+              },
+              {
+                "name": "fail",
+                "data_source": "metrics",
+                "query": "sum:prompter.probe.failures{service:$svc,env:$env}.rollup(rate,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Ensure-version p95 (ms)",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "p95(ev)"
+              }
+            ],
+            "queries": [
+              {
+                "name": "ev",
+                "data_source": "metrics",
+                "query": "distribution:prompter.ensure_version.latency{service:$svc,env:$env}.rollup(p95,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Celery retries / min",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "60 * retries"
+              }
+            ],
+            "queries": [
+              {
+                "name": "retries",
+                "data_source": "metrics",
+                "query": "sum:celery.task.retries{service:$svc,env:$env}.rollup(rate,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Results per minute",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "60 * inserts"
+              }
+            ],
+            "queries": [
+              {
+                "name": "inserts",
+                "data_source": "metrics",
+                "query": "sum:prompter.results.insert.count{service:$svc,env:$env}.rollup(rate,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "Redis up (1 ok)",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "avg:prompter.redis.up{service:$svc,env:$env}.rollup(avg,60)"
+              }
+            ],
+            "response_format": "scalar"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "DB unique-violation / min",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "60 * uniq"
+              }
+            ],
+            "queries": [
+              {
+                "name": "uniq",
+                "data_source": "metrics",
+                "query": "sum:prompter.db.unique_violation{service:$svc,env:$env}.rollup(rate,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ]
+      }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "OpenAI fingerprint presence (%)",
+        "requests": [
+          {
+            "formulas": [
+              {
+                "formula": "100 * (fp / all)"
+              }
+            ],
+            "queries": [
+              {
+                "name": "fp",
+                "data_source": "metrics",
+                "query": "sum:prompter.results.openai_fingerprint.present{service:$svc,env:$env}.rollup(rate,60)"
+              },
+              {
+                "name": "all",
+                "data_source": "metrics",
+                "query": "sum:prompter.results.insert.count{service:$svc,env:$env}.rollup(rate,60)"
+              }
+            ],
+            "response_format": "timeseries"
+          }
+        ]
+      }
+    }
+  ],
+  "layout_type": "ordered",
+  "is_read_only": false,
+  "notify_list": [],
+  "template_variables": [
+    {
+      "name": "env",
+      "prefix": "env",
+      "default": "prod"
+    },
+    {
+      "name": "svc",
+      "prefix": "service",
+      "default": "prompter-api"
+    }
+  ]
+}
