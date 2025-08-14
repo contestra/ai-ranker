@@ -383,11 +383,20 @@ Access at: http://localhost:3001
 - No model fingerprint visibility in UI
 - Cannot track prompt performance across model updates
 
-##### Upcoming Changes (Prompter Upgrade ONLY)
+##### Upcoming Changes (Prompter Upgrade V3)
 - Will DROP and rebuild ONLY: prompt_templates, prompt_runs, prompt_results
+- Will ADD: prompt_versions table for model version tracking
 - Will PRESERVE: ALS tables, brands, entity_mentions, countries, and ALL other features
-- Implementing proper deduplication based on config hash + model fingerprint
+- Implementing workspace (brand) scoped deduplication
+- Config hash for generation settings only (aliases stay out)
+- analysis_config field for future alias detection
 - Clean slate approach - no migration of existing prompt data needed
+
+##### Implementation Resources Ready
+- FINAL_PROMPTER_UPGRADE_PROMPT_V3.md: Complete specification with workspace support
+- PROMPTER_INTEGRATION_PLAN.md: Step-by-step integration guide
+- Production-ready modules provided: canonicalize.py, provider_probe.py
+- Comprehensive testing protocol included
 
 ## Model Support Status (UPDATED Aug 13, 2025)
 
