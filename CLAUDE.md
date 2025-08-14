@@ -518,6 +518,7 @@ if response.ok:
 - `PROMPTER_V7_ROUTER_WITH_METRICS.md` - Updated router with integrated metrics
 - `PROMPTER_V7_INSTRUMENTED_SERVICE_LAYER.md` - Service layer with probe metrics
 - `PROMPTER_V7_FAKE_LLM_INTEGRATION.md` - Fake LLM for complete local testing
+- `PROMPTER_V7_FINAL_TEST_ENHANCEMENTS.md` - Enhanced tests with fingerprint validation
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
@@ -527,6 +528,7 @@ if response.ok:
 - `provider_probe.py` - Stubbed provider probe for development
 - `conftest.py` - Pytest configuration with mocked provider probes
 - `test_prompter_router_min.py` - End-to-end tests for all endpoints
+- `test_prompter_router_min_v2.py` - Enhanced tests with fingerprint and metrics validation
 - `v7_prompt_upgrade_20250814141329.py` - Alembic migration for PostgreSQL
 - `test_alembic_v7_migration.py` - PostgreSQL migration round-trip test
 - `sqlite_v7_parity.sql` - SQLite schema for development parity
