@@ -357,13 +357,37 @@ npm run dev
 
 Access at: http://localhost:3001
 
-### Current Session Status (Aug 13, 2025 - UPDATED)
-- Frontend running on port 3002 (was 3001)
+### Current Session Status (Aug 14, 2025)
+
+#### ⚠️ CHECKPOINT: System Stable Before Prompter Upgrade
+**This commit represents a fully working system before major Prompter feature rebuild**
+
+##### System Status
+- Frontend running on port 3001
 - Backend running on port 8000
-- All encoding issues resolved
-- **GPT-5 models NOW WORKING properly** (25-30 second response times)
-- **ALS (Ambient Locale System) verified working with both GPT-5 and Gemini**
-- AVEA brand properly shows KNOWN_WEAK with disambiguation warning
+- All core features operational
+- **ALS feature**: ✅ Working perfectly with all 8 countries (DO NOT MODIFY)
+- **Entity strength analysis**: ✅ Operational
+- **Brand tracking**: ✅ Functional
+- **Prompt integrity hashing**: ✅ SHA256 system implemented
+
+##### Recent Implementations (Aug 11-14, 2025)
+1. **Gemini Metadata Capture**: Successfully capturing model fingerprints
+2. **Prompt Hashing System**: SHA256 integrity checking implemented
+3. **Database Linkage**: 186 results properly linked to hashed prompts
+4. **System Health Monitoring**: All services reporting healthy
+5. **Locale Testing**: 100% success rate across all 8 countries
+
+##### Known Issues Being Addressed
+- **Prompter has 17+ duplicate prompts** (same config, different names)
+- No model fingerprint visibility in UI
+- Cannot track prompt performance across model updates
+
+##### Upcoming Changes (Prompter Upgrade ONLY)
+- Will DROP and rebuild ONLY: prompt_templates, prompt_runs, prompt_results
+- Will PRESERVE: ALS tables, brands, entity_mentions, countries, and ALL other features
+- Implementing proper deduplication based on config hash + model fingerprint
+- Clean slate approach - no migration of existing prompt data needed
 
 ## Model Support Status (UPDATED Aug 13, 2025)
 
