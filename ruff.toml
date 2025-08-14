@@ -1,0 +1,21 @@
+# .ruff.toml — Prompter V7
+# Matches Black's default line length and Py 3.11+ target.
+# Uses Ruff 0.5+ config schema.
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+# Core errors, imports (isort), modernize, bugbear, simple refactors, comprehensions, Ruff rules.
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+# Let Black handle long lines & E203 (slice syntax spacing) to avoid conflicts.
+ignore = ["E203", "E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["prompter", "services"]
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic migrations often contain long strings & star imports.
+"alembic/versions/*.py" = ["E402", "F401", "F403", "E501"]
