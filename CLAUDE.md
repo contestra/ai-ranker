@@ -475,6 +475,19 @@ Requires `FLY_API_TOKEN` environment variable set.
 4. Consider using faster models as primary with GPT-5 as fallback
 5. Add progress indicators for long-running requests
 
+## ⚠️ MANDATORY: System Integrity Rules
+
+**CRITICAL**: Before making ANY changes, you MUST read SYSTEM_INTEGRITY_RULES.md
+
+This is a suite of integrated features, not a single application. When working on one feature, you MUST NOT break others. The golden rule: **"Fix one thing, break nothing else"**
+
+See SYSTEM_INTEGRITY_RULES.md for:
+- Feature boundaries and isolation rules
+- List of files that belong to each feature
+- Shared components that require extreme caution
+- Testing mandate after any changes
+- Historical incidents to avoid repeating
+
 ## Contact & Support
 
 For issues or questions about this codebase, reference this CLAUDE.md file which contains the most recent context and fixes applied.
