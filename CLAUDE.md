@@ -513,6 +513,7 @@ if response.ok:
 - `PROMPTER_V7_ALEMBIC_MIGRATION.md` - PostgreSQL database migration guide
 - `PROMPTER_V7_TESTING_AND_SQLITE_PARITY.md` - Testing infrastructure and SQLite dev support
 - `PROMPTER_V7_OBSERVABILITY_DASHBOARDS.md` - Grafana and DataDog monitoring dashboards
+- `PROMPTER_V7_PROMETHEUS_METRICS.md` - Prometheus metrics module documentation
 
 ### Prompter V7 Implementation Files
 - `prompter_router_min.py` - Complete working FastAPI router implementation
@@ -528,6 +529,8 @@ if response.ok:
 - `grafana_prompter_rollout_dashboard.json` - Grafana dashboard for Prometheus metrics
 - `datadog_prompter_rollout_dashboard.json` - DataDog dashboard configuration
 - `observability_readme.md` - Quick setup guide for monitoring
+- `prompter_metrics.py` - Complete Prometheus metrics module with middleware
+- `METRICS_INTEGRATION_PATCH.md` - Instructions for wiring metrics into the application
 
 ## Deployment
 
