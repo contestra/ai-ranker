@@ -12,12 +12,18 @@ import asyncio
 from sqlalchemy import text
 
 from app.database import get_db, engine
+from app.models import prompt_tracking as prompt_models  # Import models to ensure tables are created
 from app.llm.langchain_adapter import LangChainAdapter
 from app.config import settings
 from app.services.evidence_pack_builder import evidence_pack_builder
 from app.services.als import als_service
 from app.services.als.country_codes import country_to_num, num_to_country
-from app.services.prompt_hasher import calculate_prompt_hash, verify_prompt_integrity
+from app.services.prompt_hasher import (
+    calculate_prompt_hash, 
+    verify_prompt_integrity,
+    _normalize_countries,
+    _normalize_modes
+)
 
 router = APIRouter(prefix="/api/prompt-tracking", tags=["prompt-tracking"])
 
@@ -46,6 +52,14 @@ class PromptSchedule(BaseModel):
     timezone: str = "UTC"
     is_active: bool = True
 
+class DuplicateCheckRequest(BaseModel):
+    brand_name: str
+    prompt_text: str
+    model_name: Optional[str] = "gemini"
+    countries: Optional[List[str]] = None
+    grounding_modes: Optional[List[str]] = None
+    prompt_type: Optional[str] = "custom"
+
 @router.get("/templates")
 async def get_templates(brand_name: Optional[str] = None):
     """Get all prompt templates, optionally filtered by brand"""
@@ -53,7 +67,7 @@ async def get_templates(brand_name: Optional[str] = None):
         if brand_name:
             query = text("""
                 SELECT id, brand_name, template_name, prompt_text, prompt_type, 
-                       countries, grounding_modes, is_active, created_at, updated_at, model_name
+                       countries, grounding_modes, is_active, created_at, updated_at, model_name, prompt_hash
                 FROM prompt_templates 
                 WHERE brand_name = :brand OR brand_name = 'DEFAULT'
                 ORDER BY created_at DESC
@@ -62,7 +76,7 @@ async def get_templates(brand_name: Optional[str] = None):
         else:
             query = text("""
                 SELECT id, brand_name, template_name, prompt_text, prompt_type, 
-                       countries, grounding_modes, is_active, created_at, updated_at, model_name
+                       countries, grounding_modes, is_active, created_at, updated_at, model_name, prompt_hash
                 FROM prompt_templates 
                 ORDER BY created_at DESC
             """)
@@ -89,6 +103,10 @@ async def get_templates(brand_name: Optional[str] = None):
             # Get model_name with fallback to default
             model_name = row.model_name if hasattr(row, 'model_name') and row.model_name else 'gemini'
             
+            # Get prompt hash (first 8 chars for display)
+            prompt_hash = row.prompt_hash if hasattr(row, 'prompt_hash') and row.prompt_hash else None
+            prompt_hash_short = prompt_hash[:8] + "..." if prompt_hash else None
+            
             templates.append({
                 "id": row.id,
                 "brand_name": row.brand_name,
@@ -99,18 +117,165 @@ async def get_templates(brand_name: Optional[str] = None):
                 "countries": countries,
                 "grounding_modes": grounding_modes,
                 "is_active": row.is_active,
-                "created_at": created_at
+                "created_at": created_at,
+                "prompt_hash": prompt_hash_short,
+                "prompt_hash_full": prompt_hash
             })
         
         return {"templates": templates}
 
+@router.post("/templates/check-duplicate")
+async def check_duplicate(request: DuplicateCheckRequest):
+    """Check if a template bundle already exists, with detailed similarity info"""
+    with engine.connect() as conn:
+        # Calculate bundle hash for exact match
+        bundle_hash = calculate_prompt_hash(
+            request.prompt_text,
+            model_name=request.model_name,
+            countries=request.countries or [],
+            grounding_modes=request.grounding_modes or [],
+            prompt_type=request.prompt_type
+        )
+        
+        # Check for exact bundle match
+        exact_query = text("""
+            SELECT id, template_name, created_at, model_name
+            FROM prompt_templates 
+            WHERE brand_name = :brand 
+              AND prompt_hash = :hash 
+              AND is_active = 1
+            LIMIT 1
+        """)
+        
+        exact_match = conn.execute(exact_query, {
+            "brand": request.brand_name,
+            "hash": bundle_hash
+        }).fetchone()
+        
+        # Check for same text but different config
+        text_only_hash = calculate_prompt_hash(request.prompt_text)  # Legacy text-only hash
+        similar_query = text("""
+            SELECT id, template_name, model_name, countries, grounding_modes
+            FROM prompt_templates 
+            WHERE brand_name = :brand 
+              AND prompt_text = :text
+              AND is_active = 1
+              AND prompt_hash != :bundle_hash
+            LIMIT 5
+        """)
+        
+        similar_templates = conn.execute(similar_query, {
+            "brand": request.brand_name,
+            "text": request.prompt_text,
+            "bundle_hash": bundle_hash
+        }).fetchall()
+        
+        # Build response
+        response = {
+            "exact_match": exact_match is not None,
+            "duplicate_template_id": exact_match[0] if exact_match else None,
+            "same_text_diff_config": len(similar_templates) > 0,
+            "prompt_hash": bundle_hash[:8] + "...",
+            "closest": []
+        }
+        
+        if exact_match:
+            created_at = exact_match[2]
+            if created_at and hasattr(created_at, 'isoformat'):
+                created_at = created_at.isoformat()
+            
+            response["existing_template"] = {
+                "id": exact_match[0],
+                "name": exact_match[1],
+                "created_at": created_at,
+                "model": exact_match[3] if len(exact_match) > 3 else None
+            }
+            response["message"] = "This exact configuration already exists"
+            response["is_duplicate"] = True
+        else:
+            response["is_duplicate"] = False
+            response["message"] = "This configuration is unique"
+            
+            # Add similar templates info
+            for similar in similar_templates:
+                countries = similar[3]
+                if isinstance(countries, str):
+                    import json as json_lib
+                    try:
+                        countries = json_lib.loads(countries)
+                    except:
+                        countries = countries.split(',') if countries else []
+                
+                modes = similar[4]
+                if isinstance(modes, str):
+                    import json as json_lib
+                    try:
+                        modes = json_lib.loads(modes)
+                    except:
+                        modes = modes.split(',') if modes else []
+                
+                response["closest"].append({
+                    "template_id": similar[0],
+                    "name": similar[1],
+                    "model_id": similar[2],
+                    "countries": countries,
+                    "grounding_modes": modes,
+                    "similarity": "same_prompt"
+                })
+        
+        return response
+
 @router.post("/templates")
 async def create_template(template: PromptTemplate):
-    """Create a new prompt template"""
+    """Create a new prompt template with bundle-aware deduplication"""
     with engine.begin() as conn:
-        # Calculate hash for the prompt
-        prompt_hash = calculate_prompt_hash(template.prompt_text)
+        # Calculate bundle hash (prompt + model + countries + modes + type)
+        prompt_hash = calculate_prompt_hash(
+            template.prompt_text,
+            model_name=template.model_name,
+            countries=template.countries,
+            grounding_modes=template.grounding_modes,
+            prompt_type=template.prompt_type
+        )
         
+        # Check for duplicate bundle within the same brand
+        duplicate_check = text("""
+            SELECT id, template_name, model_name
+            FROM prompt_templates 
+            WHERE brand_name = :brand 
+              AND prompt_hash = :hash 
+              AND is_active = 1
+            LIMIT 1
+        """)
+        
+        existing = conn.execute(duplicate_check, {
+            "brand": template.brand_name,
+            "hash": prompt_hash
+        }).fetchone()
+        
+        if existing:
+            # Duplicate bundle found - return a 409 Conflict
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "duplicate_template",
+                    "message": "This exact configuration already exists (same prompt, model, countries, and grounding modes)",
+                    "existing_template": {
+                        "id": existing[0],
+                        "name": existing[1],
+                        "model": existing[2] if len(existing) > 2 else None
+                    },
+                    "suggestion": f"You can use the existing template '{existing[1]}' or modify your configuration.",
+                    "prompt_hash": prompt_hash[:8] + "...",
+                    "dedupe_by": {
+                        "model": template.model_name,
+                        "countries": _normalize_countries(template.countries),
+                        "modes": _normalize_modes(template.grounding_modes)
+                    }
+                }
+            )
+        
+        # No duplicate, proceed with creation
         query = text("""
             INSERT INTO prompt_templates 
             (brand_name, template_name, prompt_text, prompt_hash, prompt_type, model_name, countries, grounding_modes, is_active)
@@ -137,7 +302,11 @@ async def create_template(template: PromptTemplate):
         
         template_id = result.fetchone()[0]
         
-        return {"id": template_id, "message": "Template created successfully"}
+        return {
+            "id": template_id, 
+            "message": "Template created successfully",
+            "is_duplicate": False
+        }
 
 @router.put("/templates/{template_id}")
 async def update_template(template_id: int, template: PromptTemplate):
@@ -150,8 +319,14 @@ async def update_template(template_id: int, template: PromptTemplate):
         if not result:
             raise HTTPException(status_code=404, detail="Template not found")
         
-        # Calculate new hash for updated prompt
-        prompt_hash = calculate_prompt_hash(template.prompt_text)
+        # Calculate new bundle hash for updated template
+        prompt_hash = calculate_prompt_hash(
+            template.prompt_text,
+            model_name=template.model_name,
+            countries=template.countries,
+            grounding_modes=template.grounding_modes,
+            prompt_type=template.prompt_type
+        )
         
         # Update template
         update_query = text("""
@@ -476,9 +651,15 @@ async def get_runs(
     status: Optional[str] = None,
     limit: int = Query(default=50, le=200)
 ):
-    """Get prompt run history"""
+    """Get prompt run history with metadata"""
     with engine.connect() as conn:
-        query_parts = ["SELECT * FROM prompt_runs WHERE 1=1"]
+        # Use simpler query without fingerprint columns for compatibility
+        query_parts = ["""
+            SELECT r.*, res.prompt_hash
+            FROM prompt_runs r
+            LEFT JOIN prompt_results res ON r.id = res.run_id
+            WHERE 1=1
+        """]
         params = {}
         
         if brand_name:
@@ -498,6 +679,10 @@ async def get_runs(
         
         runs = []
         for row in result:
+            # Get metadata for display
+            prompt_hash = row.prompt_hash if hasattr(row, 'prompt_hash') and row.prompt_hash else None
+            prompt_hash_short = prompt_hash[:8] + "..." if prompt_hash else None
+            
             runs.append({
                 "id": row.id,
                 "template_id": row.template_id,
@@ -509,7 +694,8 @@ async def get_runs(
                 "started_at": row.started_at.isoformat() if row.started_at and hasattr(row.started_at, 'isoformat') else row.started_at,
                 "completed_at": row.completed_at.isoformat() if row.completed_at and hasattr(row.completed_at, 'isoformat') else row.completed_at,
                 "error_message": row.error_message,
-                "created_at": row.created_at.isoformat() if row.created_at and hasattr(row.created_at, 'isoformat') else row.created_at
+                "created_at": row.created_at.isoformat() if row.created_at and hasattr(row.created_at, 'isoformat') else row.created_at,
+                "prompt_hash": prompt_hash_short
             })
         
         return {"runs": runs}
@@ -545,6 +731,13 @@ async def get_run_results(run_id: int):
             import json as json_lib
             competitors = json_lib.loads(competitors)
         
+        # Get prompt hash and fingerprint for display
+        prompt_hash = result.prompt_hash if hasattr(result, 'prompt_hash') and result.prompt_hash else None
+        prompt_hash_short = prompt_hash[:8] + "..." if prompt_hash else None
+        
+        system_fingerprint = result.system_fingerprint if hasattr(result, 'system_fingerprint') and result.system_fingerprint else None
+        model_version = result.model_version if hasattr(result, 'model_version') and result.model_version else None
+        
         return {
             "run": {
                 "id": run.id,
@@ -561,7 +754,11 @@ async def get_run_results(run_id: int):
                 "brand_mentioned": result.brand_mentioned,
                 "mention_count": result.mention_count,
                 "competitors_mentioned": competitors,
-                "confidence_score": result.confidence_score
+                "confidence_score": result.confidence_score,
+                "prompt_hash": prompt_hash_short,
+                "prompt_hash_full": prompt_hash,
+                "system_fingerprint": system_fingerprint,
+                "model_version": model_version
             }
         }
 

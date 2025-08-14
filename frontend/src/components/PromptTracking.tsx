@@ -98,6 +98,25 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
   const [editingTemplate, setEditingTemplate] = useState<number | null>(null)
   const [expandedResults, setExpandedResults] = useState<{ [key: number]: any }>({})
   const [loadingResults, setLoadingResults] = useState<{ [key: number]: boolean }>({})
+  const [duplicateError, setDuplicateError] = useState<{ show: boolean; existingTemplate?: string } | null>(null)
+  const [duplicateCheck, setDuplicateCheck] = useState<{
+    checking: boolean
+    isDuplicate: boolean
+    existingTemplate?: { id: number; name: string; created_at: string; model?: string }
+    lastChecked?: string
+    isCopyOperation?: boolean  // Track if this is from a copy operation
+    originalCopiedData?: {  // Store the original copied template data
+      prompt_text: string
+      model_name: string
+      countries: string[]
+      grounding_modes: string[]
+      prompt_type: string
+    }
+    sameTextDiffConfig?: boolean  // Same prompt text but different config
+    similarTemplates?: Array<{ template_id: number; name: string; model_id: string; countries: string[]; grounding_modes: string[] }>
+  }>({ checking: false, isDuplicate: false })
+  
+  const [nameError, setNameError] = useState<string>('')  // Track template name errors
   
   // Form state for new/edit template
   const [newTemplate, setNewTemplate] = useState({
@@ -207,11 +226,170 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
     }
   }, [brandName, templates])
 
+  // Check for duplicate prompts in real-time
+  useEffect(() => {
+    const checkDuplicate = async () => {
+      // Skip all duplicate checking during copy operations
+      if (duplicateCheck.isCopyOperation) {
+        return
+      }
+
+      if (!newTemplate.prompt_text || newTemplate.prompt_text.length < 5) {
+        setDuplicateCheck(prev => ({ ...prev, checking: false, isDuplicate: false }))
+        return
+      }
+
+      // Create a bundle key for caching
+      const bundleKey = JSON.stringify({
+        prompt_text: newTemplate.prompt_text,
+        model_name: newTemplate.model_name,
+        countries: newTemplate.countries.sort(),
+        grounding_modes: newTemplate.grounding_modes.sort(),
+        prompt_type: newTemplate.prompt_type
+      })
+      
+      // Don't re-check the same bundle
+      if (duplicateCheck.lastChecked === bundleKey) {
+        return
+      }
+
+      setDuplicateCheck(prev => ({ ...prev, checking: true }))
+
+      const checkData = {
+        brand_name: brandName,
+        prompt_text: newTemplate.prompt_text,
+        model_name: newTemplate.model_name,
+        countries: newTemplate.countries,
+        grounding_modes: newTemplate.grounding_modes,
+        prompt_type: newTemplate.prompt_type
+      }
+      
+      console.log('Checking duplicate with:', checkData)
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/prompt-tracking/templates/check-duplicate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(checkData)
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setDuplicateCheck({
+            checking: false,
+            isDuplicate: data.is_duplicate || data.exact_match,
+            existingTemplate: data.existing_template,
+            lastChecked: bundleKey,
+            sameTextDiffConfig: data.same_text_diff_config,
+            similarTemplates: data.closest
+          })
+        }
+      } catch (error) {
+        console.error('Failed to check duplicate:', error)
+        setDuplicateCheck({ checking: false, isDuplicate: false })
+      }
+    }
+
+    // Debounce the check by 500ms
+    const timer = setTimeout(checkDuplicate, 500)
+    return () => clearTimeout(timer)
+  }, [
+    newTemplate.prompt_text, 
+    newTemplate.model_name,
+    newTemplate.prompt_type,
+    newTemplate.countries,
+    newTemplate.grounding_modes,
+    brandName, 
+    duplicateCheck.isCopyOperation
+  ])
+  
+  // Clear copy flag when user modifies any key field
+  useEffect(() => {
+    if (duplicateCheck.isCopyOperation && duplicateCheck.originalCopiedData) {
+      const orig = duplicateCheck.originalCopiedData
+      const hasChanged = 
+        newTemplate.prompt_text !== orig.prompt_text ||
+        newTemplate.model_name !== orig.model_name ||
+        newTemplate.prompt_type !== orig.prompt_type ||
+        JSON.stringify(newTemplate.countries.sort()) !== JSON.stringify(orig.countries.sort()) ||
+        JSON.stringify(newTemplate.grounding_modes.sort()) !== JSON.stringify(orig.grounding_modes.sort())
+      
+      if (hasChanged) {
+        // User has modified something - clear the copy flag and reset duplicate state
+        setDuplicateCheck(prev => ({ 
+          ...prev, 
+          isCopyOperation: false,
+          originalCopiedData: undefined,
+          isDuplicate: false,
+          checking: false,
+          lastChecked: undefined  // Force re-check with new config
+        }))
+      }
+    }
+  }, [newTemplate, duplicateCheck.isCopyOperation, duplicateCheck.originalCopiedData])
+
+  // Check for duplicate template name in real-time
+  useEffect(() => {
+    if (!newTemplate.template_name) {
+      setNameError('')
+      return
+    }
+    
+    const duplicateName = templates.find(t => 
+      t.brand_name === brandName && 
+      t.template_name === newTemplate.template_name && 
+      t.id !== editingTemplate
+    )
+    
+    if (duplicateName) {
+      setNameError('A template with this name already exists. Please choose a unique name.')
+    } else {
+      setNameError('')
+    }
+  }, [newTemplate.template_name, templates, brandName, editingTemplate])
+
+  // Helper to check if template has been modified from copy
+  const isUnmodifiedCopy = () => {
+    if (!duplicateCheck.isCopyOperation || !duplicateCheck.originalCopiedData) {
+      return false
+    }
+    
+    const orig = duplicateCheck.originalCopiedData
+    return (
+      newTemplate.prompt_text === orig.prompt_text &&
+      newTemplate.model_name === orig.model_name &&
+      newTemplate.prompt_type === orig.prompt_type &&
+      JSON.stringify(newTemplate.countries.sort()) === JSON.stringify(orig.countries.sort()) &&
+      JSON.stringify(newTemplate.grounding_modes.sort()) === JSON.stringify(orig.grounding_modes.sort())
+    )
+  }
+
   // Create or update template
   const saveTemplate = async () => {
+    // Clear any existing error when attempting to save
+    setDuplicateError(null)
+    
     if (!newTemplate.template_name || !newTemplate.prompt_text) {
       alert('Please fill in template name and prompt text')
       return
+    }
+
+    // Check if there's a name error
+    if (nameError) {
+      alert(nameError)
+      return
+    }
+
+    // Check if this is an unmodified copy
+    if (isUnmodifiedCopy()) {
+      const proceed = window.confirm(
+        "You haven't modified the copied template. This will create an exact duplicate.\n\n" +
+        "Consider changing the model, countries, or grounding modes to create a variation.\n\n" +
+        "Do you want to continue anyway?"
+      )
+      if (!proceed) {
+        return
+      }
     }
 
     try {
@@ -244,9 +422,25 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
           grounding_modes: ['none']
         })
         setEditingTemplate(null)
+      } else if (response.status === 409) {
+        // Handle duplicate template error
+        const errorData = await response.json()
+        const detail = errorData.detail
+        
+        // Set error state to show in UI
+        setDuplicateError({
+          show: true,
+          existingTemplate: detail.existing_template?.name || 'another template'
+        })
+      } else {
+        // Handle other errors
+        const errorData = await response.json()
+        console.error('Failed to save template:', errorData)
+        alert('Failed to save template. Please try again.')
       }
     } catch (error) {
       console.error('Failed to save template:', error)
+      alert('An error occurred while saving the template.')
     }
   }
 
@@ -283,14 +477,32 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
 
   // Copy template
   const copyTemplate = (template: PromptTemplate) => {
-    setNewTemplate({
-      template_name: `${template.template_name} (Copy)`,
-      prompt_text: template.prompt_text,
+    const copiedData = {
+      template_name: '',  // Clear the name so user must enter a new one
+      prompt_text: template.prompt_text,  // Keep exact text
       prompt_type: template.prompt_type,
+      model_name: template.model_name || 'gemini',  // Copy the model from the original template
       countries: template.countries,
       grounding_modes: template.grounding_modes
-    })
+    }
+    
+    setNewTemplate(copiedData)
     setEditingTemplate(null)
+    
+    // Mark this as a copy operation and store original data to check if modified
+    setDuplicateCheck({ 
+      checking: false, 
+      isDuplicate: false,
+      isCopyOperation: true,
+      originalCopiedData: {
+        prompt_text: copiedData.prompt_text,
+        model_name: copiedData.model_name,
+        countries: [...copiedData.countries],
+        grounding_modes: [...copiedData.grounding_modes],
+        prompt_type: copiedData.prompt_type
+      },
+      lastChecked: undefined  // Reset so it will check when user modifies
+    })
   }
 
   // Cancel edit
@@ -469,17 +681,34 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
               <div className="p-6 space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Template Name
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="template-name" className="block text-sm font-medium text-gray-700">
+                        Template Name
+                      </label>
+                      {nameError && (
+                        <span className="text-xs text-red-600 flex items-center">
+                          <ExclamationCircleIcon className="w-3 h-3 mr-1" />
+                          {nameError}
+                        </span>
+                      )}
+                    </div>
                     <input
                       type="text"
                       id="template-name"
-                      placeholder="e.g., Brand Recognition"
+                      placeholder="e.g., Brand Recognition Test"
                       value={newTemplate.template_name}
                       onChange={(e) => setNewTemplate({ ...newTemplate, template_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none ${
+                        nameError 
+                          ? 'border-red-400 focus:ring-red-500 focus:border-red-500 bg-red-50/50' 
+                          : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                      }`}
                     />
+                    {duplicateCheck.isCopyOperation && !newTemplate.template_name && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Please enter a unique name for this copied template
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="model-name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -519,20 +748,116 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                 </div>
 
                 <div>
-                  <label htmlFor="prompt-text" className="block text-sm font-medium text-gray-700 mb-1">
-                    Prompt Text
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="prompt-text" className="block text-sm font-medium text-gray-700">
+                      Prompt Text
+                    </label>
+                    {duplicateCheck.checking && (
+                      <span className="text-xs text-gray-500 flex items-center">
+                        <ClockIcon className="w-3 h-3 mr-1 animate-spin" />
+                        Checking for duplicates...
+                      </span>
+                    )}
+                    {!duplicateCheck.checking && duplicateCheck.isDuplicate && (
+                      <span className="text-xs text-amber-600 flex items-center">
+                        <ExclamationCircleIcon className="w-3 h-3 mr-1" />
+                        Duplicate found
+                      </span>
+                    )}
+                    {!duplicateCheck.checking && !duplicateCheck.isDuplicate && newTemplate.prompt_text.length > 5 && (
+                      <span className="text-xs text-green-600 flex items-center">
+                        <CheckCircleIcon className="w-3 h-3 mr-1" />
+                        Unique prompt
+                      </span>
+                    )}
+                  </div>
                   <textarea
                     id="prompt-text"
                     placeholder="Use {brand_name} as a placeholder for the brand"
                     value={newTemplate.prompt_text}
-                    onChange={(e) => setNewTemplate({ ...newTemplate, prompt_text: e.target.value })}
+                    onChange={(e) => {
+                      setNewTemplate({ ...newTemplate, prompt_text: e.target.value })
+                      // Clear old error state
+                      if (duplicateError?.show) {
+                        setDuplicateError(null)
+                      }
+                    }}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 ${
+                      duplicateCheck.isDuplicate ? 'border-amber-400 bg-amber-50' : 'border-gray-300'
+                    }`}
                   />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Tip: Use {'{brand_name}'} in your prompt and it will be replaced with "{brandName}"
-                  </p>
+                  
+                  {/* Show duplicate info with helpful options - but not when copying */}
+                  {duplicateCheck.isDuplicate && duplicateCheck.existingTemplate && !duplicateCheck.isCopyOperation && (
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-amber-800">
+                            This prompt already exists
+                          </p>
+                          <p className="text-sm text-amber-700 mt-1">
+                            Template: <span className="font-medium">"{duplicateCheck.existingTemplate.name}"</span>
+                          </p>
+                          <p className="text-xs text-amber-600 mt-1">
+                            Created: {new Date(duplicateCheck.existingTemplate.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2 ml-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Find and run the existing template
+                              const existing = templates.find(t => t.id === duplicateCheck.existingTemplate?.id)
+                              if (existing) {
+                                runPrompt(existing.id)
+                                // Clear the form
+                                setNewTemplate({
+                                  template_name: '',
+                                  prompt_text: '',
+                                  prompt_type: 'custom',
+                                  model_name: 'gemini',
+                                  countries: ['NONE'],
+                                  grounding_modes: ['none']
+                                })
+                                setDuplicateCheck({ checking: false, isDuplicate: false })
+                              }
+                            }}
+                            className="text-xs px-3 py-1 bg-white border border-amber-300 text-amber-700 rounded hover:bg-amber-100"
+                          >
+                            Run Existing
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Scroll to and highlight the existing template
+                              const element = document.getElementById(`template-${duplicateCheck.existingTemplate?.id}`)
+                              if (element) {
+                                element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                element.classList.add('ring-2', 'ring-amber-400')
+                                setTimeout(() => {
+                                  element.classList.remove('ring-2', 'ring-amber-400')
+                                }, 3000)
+                              }
+                            }}
+                            className="text-xs px-3 py-1 bg-white border border-amber-300 text-amber-700 rounded hover:bg-amber-100"
+                          >
+                            View Template
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-xs text-amber-600 mt-2">
+                        💡 Tip: Run the existing template with different models, or modify your prompt to create a variation
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Regular tip when no duplicate */}
+                  {!duplicateCheck.isDuplicate && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Tip: Use {'{brand_name}'} in your prompt and it will be replaced with "{brandName}"
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -601,10 +926,36 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
 
                 <button
                   onClick={saveTemplate}
-                  className="w-full btn-contestra-primary flex items-center justify-center"
+                  disabled={(duplicateCheck.isDuplicate && !editingTemplate && !duplicateCheck.isCopyOperation) || !!nameError}
+                  className={`w-full flex items-center justify-center ${
+                    (duplicateCheck.isDuplicate && !editingTemplate && !duplicateCheck.isCopyOperation) || nameError
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed py-2 px-4 rounded-md' 
+                      : 'btn-contestra-primary'
+                  }`}
+                  title={
+                    nameError 
+                      ? nameError 
+                      : (duplicateCheck.isDuplicate && !duplicateCheck.isCopyOperation 
+                          ? 'This configuration already exists. Modify something to make it unique.' 
+                          : '')
+                  }
                 >
-                  <PlusIcon className="w-5 h-5 mr-2" />
-                  {editingTemplate ? 'Update Template' : 'Create Template'}
+                  {nameError ? (
+                    <>
+                      <ExclamationCircleIcon className="w-5 h-5 mr-2" />
+                      Name Already Exists
+                    </>
+                  ) : duplicateCheck.isDuplicate && !editingTemplate && !duplicateCheck.isCopyOperation ? (
+                    <>
+                      <ExclamationCircleIcon className="w-5 h-5 mr-2" />
+                      Duplicate - Use Existing or Modify Prompt
+                    </>
+                  ) : (
+                    <>
+                      <PlusIcon className="w-5 h-5 mr-2" />
+                      {editingTemplate ? 'Update Template' : 'Create Template'}
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -612,7 +963,10 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
             {/* Existing Templates */}
             <div className="grid gap-4">
               {templates.filter(t => t.brand_name === brandName).map(template => (
-                <div key={template.id} className="bg-white rounded-lg shadow">
+                <div 
+                  key={template.id} 
+                  id={`template-${template.id}`}
+                  className="bg-white rounded-lg shadow transition-all duration-300 hover:shadow-md">
                   <div className="px-6 py-4 flex justify-between items-start">
                     <div className="flex-1">
                       <h4 className="text-lg font-medium">{template.template_name}</h4>

@@ -1,5 +1,73 @@
 # CLAUDE.md - AI Rank & Influence Tracker
 
+## Latest Update (August 14, 2025) - Bundle-Aware Template Deduplication
+
+### 🎯 Major Enhancement: Templates as Run Bundles
+**Problem Solved**: Templates now properly represent complete run configurations, not just prompt text.
+
+**What Changed**:
+- Templates are now deduplicated based on the **entire configuration bundle**:
+  - Prompt text + Model + Countries + Grounding modes + Prompt type
+- Same prompt with different models = **different templates** (allowed)
+- Copy operations work intelligently without false duplicate warnings
+
+**Implementation Details**:
+
+#### Hash Calculation (`backend/app/services/prompt_hasher.py`)
+```python
+calculate_bundle_hash(
+    prompt_text="What are the best supplements?",
+    model_name="gpt-5",
+    countries=["US", "CH"],
+    grounding_modes=["web", "none"],
+    prompt_type="recognition"
+) → SHA256 hash of normalized bundle
+```
+
+**Normalizations Applied**:
+- Countries: Uppercase, sorted, UK→GB, NONE for base model
+- Grounding modes: Canonical mapping (none/web)
+- Prompt text: Whitespace collapsed
+- Prompt type: Lowercase, defaults to "custom"
+
+#### Test Matrix
+| Scenario | Same Prompt | Same Model | Same Countries | Same Modes | Same Type | Result |
+|----------|------------|------------|----------------|------------|-----------|---------|
+| Exact duplicate | ✓ | ✓ | ✓ | ✓ | ✓ | **409 Blocked** |
+| Different model | ✓ | ✗ | ✓ | ✓ | ✓ | **201 Allowed** |
+| Different countries | ✓ | ✓ | ✗ | ✓ | ✓ | **201 Allowed** |
+| Different modes | ✓ | ✓ | ✓ | ✗ | ✓ | **201 Allowed** |
+| Different type | ✓ | ✓ | ✓ | ✓ | ✗ | **201 Allowed** |
+
+#### Frontend UX Improvements
+- **Real-time duplicate checking** with visual indicators
+- **Copy operation intelligence**: No false warnings when copying templates
+- **Similar template detection**: Shows templates with same text but different configs
+- **Actionable duplicate warnings**: "Run Existing" and "View Template" buttons
+
+#### API Changes
+- `/api/prompt-tracking/templates/check-duplicate` now returns:
+  ```json
+  {
+    "exact_match": false,
+    "same_text_diff_config": true,
+    "closest": [
+      {
+        "template_id": "123",
+        "name": "Brand Recognition",
+        "model_id": "gpt-4o",
+        "countries": ["US"],
+        "similarity": "same_prompt"
+      }
+    ]
+  }
+  ```
+
+**Files Modified**:
+- `backend/app/services/prompt_hasher.py` - Bundle-aware hashing
+- `backend/app/api/prompt_tracking.py` - Updated endpoints
+- `frontend/src/components/PromptTracking.tsx` - Enhanced UX
+
 ## Latest Status (August 14, 2025)
 
 ### 🚀 Prompter V7 FINAL - Production-Ready Implementation
@@ -395,6 +463,18 @@ npm run dev
 ```
 
 Access at: http://localhost:3001
+
+### Current Session Status (Aug 14, 2025 - Evening Update)
+
+#### Resolved: Prompt Tracking Model Display Issue
+**Issue**: Results tab was showing "gemini" for all runs even when some templates used GPT-5
+**Root Cause**: Backend server had crashed/hung causing CORS errors that prevented proper data fetching
+**Solution**: Restarted backend server
+**Verification**: 
+- Database correctly stores model_name for each run
+- API correctly returns model_name in responses  
+- Frontend correctly displays run.model_name
+- Runs now show correct models (gpt-5 for GPT-5 templates, gemini for Gemini templates)
 
 ### Current Session Status (Aug 14, 2025)
 
