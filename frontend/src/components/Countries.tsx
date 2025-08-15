@@ -284,12 +284,19 @@ export default function Countries() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Country
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" colSpan={2}>
                 GPT-5 Locale Test
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" colSpan={2}>
                 Gemini 2.5 Pro Locale Test
               </th>
+            </tr>
+            <tr>
+              <th className="px-6 py-2 text-left text-xs font-medium text-gray-400"></th>
+              <th className="px-3 py-2 text-center text-xs font-medium text-gray-400">Ungrounded</th>
+              <th className="px-3 py-2 text-center text-xs font-medium text-gray-400">Grounded</th>
+              <th className="px-3 py-2 text-center text-xs font-medium text-gray-400">Ungrounded</th>
+              <th className="px-3 py-2 text-center text-xs font-medium text-gray-400">Grounded</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">

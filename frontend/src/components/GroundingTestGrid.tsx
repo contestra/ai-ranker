@@ -37,13 +37,23 @@ export default function GroundingTestGrid() {
     });
 
     try {
-      const response = await fetch('/api/test-grounding', {
+      // Use Singapore as test country with its ALS block
+      const singaporeALS = '[ALS]\nOperating from Singapore; prices in S$. Date format DD/MM/YYYY.\nPostal 018956. Tel +65 6123 4567. GST applies.\nEmergency: 999 (police), 995 (fire/ambulance).';
+      
+      const response = await fetch('http://localhost:8000/api/grounding-test/run-locale-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: test.provider,
           model: test.model,
           grounded: test.grounded,
+          country: 'SG',
+          als_block: singaporeALS,
+          expected: {
+            vat_percent: '9%',
+            plug: ['G'],
+            emergency: ['999', '995']
+          }
         }),
       });
 
@@ -51,9 +61,23 @@ export default function GroundingTestGrid() {
       
       setTestResults(prev => {
         const updated = [...prev];
+        const test = updated[index];
+        
+        // Determine if test truly passed based on grounding expectations
+        let actualStatus = 'success';
+        if (data.error) {
+          actualStatus = 'failed';
+        } else if (test.grounded && !data.grounded_effective) {
+          // Grounded test should have grounding, but doesn't
+          actualStatus = 'failed';
+        } else if (!test.grounded && data.grounded_effective) {
+          // Ungrounded test shouldn't have grounding, but does
+          actualStatus = 'failed';
+        }
+        
         updated[index] = {
           ...updated[index],
-          status: data.error ? 'failed' : 'success',
+          status: actualStatus,
           grounded_effective: data.grounded_effective,
           tool_call_count: data.tool_call_count,
           json_valid: data.json_valid,
