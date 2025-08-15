@@ -1,14 +1,14 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Loader2, Check, X, AlertCircle } from 'lucide-react';
+import { CheckCircleIcon, XCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { PlayIcon } from '@heroicons/react/24/solid';
 
 interface TestResult {
   provider: 'openai' | 'vertex';
   model: string;
   grounded: boolean;
-  status: 'pending' | 'running' | 'success' | 'failed' | 'na';
+  status: 'pending' | 'running' | 'success' | 'failed';
   grounded_effective?: boolean;
   tool_call_count?: number;
   json_valid?: boolean;
@@ -17,72 +17,12 @@ interface TestResult {
   error?: string;
 }
 
-interface Country {
-  code: string;
-  name: string;
-  flag: string;
-  expected: {
-    vat_percent: string;
-    plug: string[];
-    emergency: string[];
-  };
-  als_block: string;
-}
-
-const COUNTRIES: Country[] = [
-  {
-    code: 'SG',
-    name: 'Singapore',
-    flag: '🇸🇬',
-    expected: {
-      vat_percent: '9%',
-      plug: ['G'],
-      emergency: ['999', '995']
-    },
-    als_block: '[ALS]\nOperating from Singapore; prices in S$. Date format DD/MM/YYYY.\nPostal 018956. Tel +65 6123 4567. GST applies.\nEmergency: 999 (police), 995 (fire/ambulance).'
-  },
-  {
-    code: 'US',
-    name: 'United States',
-    flag: '🇺🇸',
-    expected: {
-      vat_percent: '0%',
-      plug: ['A', 'B'],
-      emergency: ['911']
-    },
-    als_block: '[ALS]\nOperating from USA; prices in USD. Date format MM/DD/YYYY.\nZIP 10001. Tel +1 212 555 0100. Sales tax varies by state.\nEmergency: 911.'
-  },
-  {
-    code: 'DE',
-    name: 'Germany',
-    flag: '🇩🇪',
-    expected: {
-      vat_percent: '19%',
-      plug: ['F', 'C'],
-      emergency: ['112', '110']
-    },
-    als_block: '[ALS]\nBetrieb aus Deutschland; Preise in EUR. Datumsformat TT.MM.JJJJ.\n10115 Berlin. Tel +49 30 12345678. MwSt. 19%.\nNotruf: 112 (Notfall), 110 (Polizei).'
-  },
-  {
-    code: 'CH',
-    name: 'Switzerland',
-    flag: '🇨🇭',
-    expected: {
-      vat_percent: '8.1%',
-      plug: ['J', 'C'],
-      emergency: ['112', '117', '118', '144']
-    },
-    als_block: '[ALS]\nBetrieb aus der Schweiz; Preise in CHF. Datumsformat TT.MM.JJJJ.\n8001 Zürich. Tel +41 44 123 4567. MwSt. 8.1%.\nNotruf: 112 (allgemein), 117 (Polizei), 118 (Feuerwehr), 144 (Rettung).'
-  }
-];
-
 export default function GroundingTestGrid() {
-  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]);
   const [testResults, setTestResults] = useState<TestResult[]>([
-    { provider: 'openai', model: 'gpt-4o', grounded: false, status: 'pending' },
-    { provider: 'openai', model: 'gpt-4o', grounded: true, status: 'pending' },
-    { provider: 'vertex', model: 'gemini-2.0-flash', grounded: false, status: 'pending' },
-    { provider: 'vertex', model: 'gemini-2.0-flash', grounded: true, status: 'pending' },
+    { provider: 'openai', model: 'gpt-5', grounded: false, status: 'pending' },
+    { provider: 'openai', model: 'gpt-5', grounded: true, status: 'pending' },
+    { provider: 'vertex', model: 'gemini-2.5-pro', grounded: false, status: 'pending' },
+    { provider: 'vertex', model: 'gemini-2.5-pro', grounded: true, status: 'pending' },
   ]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -90,200 +30,354 @@ export default function GroundingTestGrid() {
     const test = testResults[index];
     
     // Update status to running
-    const newResults = [...testResults];
-    newResults[index] = { ...test, status: 'running' };
-    setTestResults(newResults);
+    setTestResults(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], status: 'running' };
+      return updated;
+    });
 
     try {
-      const response = await fetch('/api/prompt-tracking/run-locale-test', {
+      const response = await fetch('/api/test-grounding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: test.provider,
           model: test.model,
           grounded: test.grounded,
-          country: selectedCountry.code,
-          als_block: selectedCountry.als_block,
-          expected: selectedCountry.expected
-        })
+        }),
       });
 
-      const result = await response.json();
+      const data = await response.json();
       
-      newResults[index] = {
-        ...test,
-        status: result.success ? 'success' : 'failed',
-        grounded_effective: result.grounded_effective,
-        tool_call_count: result.tool_call_count,
-        json_valid: result.json_valid,
-        json_obj: result.json_obj,
-        latency_ms: result.latency_ms,
-        error: result.error
-      };
+      setTestResults(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          status: data.error ? 'failed' : 'success',
+          grounded_effective: data.grounded_effective,
+          tool_call_count: data.tool_call_count,
+          json_valid: data.json_valid,
+          json_obj: data.json_obj,
+          latency_ms: data.latency_ms,
+          error: data.error,
+        };
+        return updated;
+      });
     } catch (error) {
-      newResults[index] = {
-        ...test,
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
+      setTestResults(prev => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+        return updated;
+      });
     }
-
-    setTestResults(newResults);
   };
 
   const runAllTests = async () => {
     setIsRunning(true);
     
-    // Run tests sequentially to avoid rate limits
+    // Reset all tests to pending
+    setTestResults(prev => prev.map(test => ({ ...test, status: 'pending' })));
+    
+    // Run tests sequentially to avoid overwhelming the API
     for (let i = 0; i < testResults.length; i++) {
-      if (testResults[i].status !== 'na') {
-        await runTest(i);
-      }
+      await runTest(i);
     }
     
     setIsRunning(false);
   };
 
-  const resetTests = () => {
-    setTestResults(testResults.map(t => ({ ...t, status: 'pending', grounded_effective: undefined, tool_call_count: undefined, json_valid: undefined, json_obj: undefined, latency_ms: undefined, error: undefined })));
-  };
-
-  const getStatusIcon = (result: TestResult) => {
-    switch (result.status) {
-      case 'pending':
-        return <div className="w-12 h-12 rounded-full bg-gray-200" />;
-      case 'running':
-        return <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />;
-      case 'success':
-        return <Check className="w-12 h-12 text-green-500" />;
-      case 'failed':
-        return <X className="w-12 h-12 text-red-500" />;
-      case 'na':
-        return <AlertCircle className="w-12 h-12 text-gray-400" />;
+  const getStatusIcon = (test: TestResult) => {
+    if (test.status === 'running') {
+      return (
+        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500"></div>
+      );
     }
+    
+    if (test.status === 'success') {
+      // For grounded tests, check if grounding actually happened
+      if (test.grounded && !test.grounded_effective) {
+        return <ExclamationCircleIcon className="h-5 w-5 text-yellow-500" />;
+      }
+      return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+    }
+    
+    if (test.status === 'failed') {
+      return <XCircleIcon className="h-5 w-5 text-red-500" />;
+    }
+    
+    return <div className="h-5 w-5 rounded-full bg-gray-200"></div>;
   };
 
-  const getTestDetails = (result: TestResult) => {
-    if (result.status === 'pending' || result.status === 'running') return null;
-    
-    return (
-      <div className="mt-2 text-xs space-y-1">
-        {result.grounded_effective !== undefined && (
-          <div>Grounded: {result.grounded_effective ? 'Yes' : 'No'}</div>
-        )}
-        {result.tool_call_count !== undefined && (
-          <div>Tool calls: {result.tool_call_count}</div>
-        )}
-        {result.json_valid !== undefined && (
-          <div>JSON valid: {result.json_valid ? 'Yes' : 'No'}</div>
-        )}
-        {result.latency_ms !== undefined && (
-          <div>Latency: {result.latency_ms}ms</div>
-        )}
-        {result.error && (
-          <div className="text-red-500">Error: {result.error}</div>
-        )}
-      </div>
-    );
+  const getStatusColor = (test: TestResult) => {
+    if (test.status === 'running') return 'bg-blue-50 border-blue-200';
+    if (test.status === 'success') {
+      if (test.grounded && !test.grounded_effective) {
+        return 'bg-yellow-50 border-yellow-200';
+      }
+      return 'bg-green-50 border-green-200';
+    }
+    if (test.status === 'failed') return 'bg-red-50 border-red-200';
+    return 'bg-gray-50 border-gray-200';
   };
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>4-Column Grounding Test Grid</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Country Selector */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Select Country</label>
-            <div className="flex gap-2">
-              {COUNTRIES.map(country => (
-                <Button
-                  key={country.code}
-                  variant={selectedCountry.code === country.code ? 'default' : 'outline'}
-                  onClick={() => setSelectedCountry(country)}
-                  disabled={isRunning}
-                >
-                  {country.flag} {country.name}
-                </Button>
-              ))}
-            </div>
-          </div>
+      {/* Header with Run Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">Grounding Test Grid</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Test web search grounding across GPT-5 and Gemini 2.5 Pro
+          </p>
+        </div>
+        <button
+          onClick={runAllTests}
+          disabled={isRunning}
+          className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+            isRunning
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+          }`}
+        >
+          {isRunning ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Running Tests...
+            </>
+          ) : (
+            <>
+              <PlayIcon className="h-4 w-4 mr-2" />
+              Run All Tests
+            </>
+          )}
+        </button>
+      </div>
 
-          {/* Test Controls */}
-          <div className="flex gap-2 mb-6">
-            <Button onClick={runAllTests} disabled={isRunning}>
-              {isRunning ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Running Tests...
-                </>
-              ) : (
-                'Run All Tests'
-              )}
-            </Button>
-            <Button variant="outline" onClick={resetTests} disabled={isRunning}>
-              Reset
-            </Button>
-          </div>
-
-          {/* Test Grid */}
-          <div className="grid grid-cols-4 gap-4">
-            {/* Headers */}
-            <div className="text-center font-semibold">
-              <div>GPT-4o</div>
-              <Badge variant="outline" className="mt-1">Ungrounded</Badge>
-            </div>
-            <div className="text-center font-semibold">
-              <div>GPT-4o</div>
-              <Badge variant="default" className="mt-1">Grounded</Badge>
-            </div>
-            <div className="text-center font-semibold">
-              <div>Gemini 2.0</div>
-              <Badge variant="outline" className="mt-1">Ungrounded</Badge>
-            </div>
-            <div className="text-center font-semibold">
-              <div>Gemini 2.0</div>
-              <Badge variant="default" className="mt-1">Grounded</Badge>
-            </div>
-
-            {/* Test Results */}
-            {testResults.map((result, index) => (
-              <div key={index} className="text-center p-4 border rounded-lg">
-                <div className="flex justify-center mb-2">
-                  {getStatusIcon(result)}
+      {/* Test Grid */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* GPT-5 Column */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">GPT-5</h3>
+          
+          {/* Ungrounded Test */}
+          <div className={`border rounded-lg p-4 ${getStatusColor(testResults[0])}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-gray-900">Ungrounded</h4>
+                  {getStatusIcon(testResults[0])}
                 </div>
-                {getTestDetails(result)}
-              </div>
-            ))}
-          </div>
-
-          {/* Expected Values */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-semibold mb-2">Expected Values for {selectedCountry.flag} {selectedCountry.name}</h3>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="font-medium">VAT/GST:</span> {selectedCountry.expected.vat_percent}
-              </div>
-              <div>
-                <span className="font-medium">Plug:</span> {selectedCountry.expected.plug.join(', ')}
-              </div>
-              <div>
-                <span className="font-medium">Emergency:</span> {selectedCountry.expected.emergency.join(', ')}
+                <p className="text-xs text-gray-500 mt-1">No web search</p>
               </div>
             </div>
+            
+            {testResults[0].status === 'success' && (
+              <div className="mt-3 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Grounded:</span>
+                  <span className={testResults[0].grounded_effective ? 'text-red-500' : 'text-green-500'}>
+                    {testResults[0].grounded_effective ? 'Yes (unexpected)' : 'No (expected)'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tool calls:</span>
+                  <span>{testResults[0].tool_call_count || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">JSON valid:</span>
+                  <span className={testResults[0].json_valid ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[0].json_valid ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Latency:</span>
+                  <span>{testResults[0].latency_ms}ms</span>
+                </div>
+              </div>
+            )}
+            
+            {testResults[0].error && (
+              <div className="mt-2 text-xs text-red-600">
+                Error: {testResults[0].error}
+              </div>
+            )}
           </div>
 
-          {/* ALS Block Preview */}
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm font-medium">View ALS Block</summary>
-            <pre className="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto">
-              {selectedCountry.als_block}
-            </pre>
-          </details>
-        </CardContent>
-      </Card>
+          {/* Grounded Test */}
+          <div className={`border rounded-lg p-4 ${getStatusColor(testResults[1])}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-gray-900">Grounded</h4>
+                  {getStatusIcon(testResults[1])}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">With web search</p>
+              </div>
+            </div>
+            
+            {testResults[1].status === 'success' && (
+              <div className="mt-3 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Grounded:</span>
+                  <span className={testResults[1].grounded_effective ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[1].grounded_effective ? 'Yes (expected)' : 'No (failed)'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Web searches:</span>
+                  <span className={testResults[1].tool_call_count ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[1].tool_call_count || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">JSON valid:</span>
+                  <span className={testResults[1].json_valid ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[1].json_valid ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Latency:</span>
+                  <span>{testResults[1].latency_ms}ms</span>
+                </div>
+              </div>
+            )}
+            
+            {testResults[1].error && (
+              <div className="mt-2 text-xs text-red-600">
+                Error: {testResults[1].error}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Gemini Column */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">Gemini 2.5 Pro</h3>
+          
+          {/* Ungrounded Test */}
+          <div className={`border rounded-lg p-4 ${getStatusColor(testResults[2])}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-gray-900">Ungrounded</h4>
+                  {getStatusIcon(testResults[2])}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">No web search</p>
+              </div>
+            </div>
+            
+            {testResults[2].status === 'success' && (
+              <div className="mt-3 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Grounded:</span>
+                  <span className={testResults[2].grounded_effective ? 'text-red-500' : 'text-green-500'}>
+                    {testResults[2].grounded_effective ? 'Yes (unexpected)' : 'No (expected)'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tool calls:</span>
+                  <span>{testResults[2].tool_call_count || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">JSON valid:</span>
+                  <span className={testResults[2].json_valid ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[2].json_valid ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Latency:</span>
+                  <span>{testResults[2].latency_ms}ms</span>
+                </div>
+              </div>
+            )}
+            
+            {testResults[2].error && (
+              <div className="mt-2 text-xs text-red-600">
+                Error: {testResults[2].error}
+              </div>
+            )}
+          </div>
+
+          {/* Grounded Test */}
+          <div className={`border rounded-lg p-4 ${getStatusColor(testResults[3])}`}>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium text-gray-900">Grounded</h4>
+                  {getStatusIcon(testResults[3])}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">With web search</p>
+              </div>
+            </div>
+            
+            {testResults[3].status === 'success' && (
+              <div className="mt-3 space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Grounded:</span>
+                  <span className={testResults[3].grounded_effective ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[3].grounded_effective ? 'Yes (expected)' : 'No (failed)'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Web searches:</span>
+                  <span className={testResults[3].tool_call_count ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[3].tool_call_count || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">JSON valid:</span>
+                  <span className={testResults[3].json_valid ? 'text-green-500' : 'text-red-500'}>
+                    {testResults[3].json_valid ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Latency:</span>
+                  <span>{testResults[3].latency_ms}ms</span>
+                </div>
+              </div>
+            )}
+            
+            {testResults[3].error && (
+              <div className="mt-2 text-xs text-red-600">
+                Error: {testResults[3].error}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+        <h3 className="text-sm font-medium text-gray-900 mb-2">Test Summary</h3>
+        <div className="grid grid-cols-4 gap-4 text-xs">
+          <div>
+            <span className="text-gray-500">Total Tests:</span>
+            <span className="ml-1 font-medium">{testResults.length}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Passed:</span>
+            <span className="ml-1 font-medium text-green-600">
+              {testResults.filter(t => t.status === 'success').length}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Failed:</span>
+            <span className="ml-1 font-medium text-red-600">
+              {testResults.filter(t => t.status === 'failed').length}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Pending:</span>
+            <span className="ml-1 font-medium text-gray-600">
+              {testResults.filter(t => t.status === 'pending').length}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
