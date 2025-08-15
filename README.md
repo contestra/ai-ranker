@@ -160,9 +160,12 @@ uvicorn app.main:app --reload  # In backend/
 
 ## 📝 Documentation
 
+- [CLAUDE.md](CLAUDE.md) - **IMPORTANT: Latest updates and critical implementation details**
+- [Grounding Implementation](GROUNDING_IMPLEMENTATION.md) - Proper API-level grounding vs prompt modification
 - [Project Overview](PROJECT_OVERVIEW.md) - Detailed architecture and methodology
 - [Multi-Tenant Architecture](MULTI_TENANT_ARCHITECTURE.md) - Domain isolation design
 - [WordPress Plugin](wordpress-plugin/README.md) - Installation and configuration
+- [System Integrity Rules](SYSTEM_INTEGRITY_RULES.md) - Critical components that must not be modified
 
 ## 🤝 Contributing
 
