@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Countries from './Countries'
+import GroundingTestGrid from './GroundingTestGrid'
 import { 
   ExclamationCircleIcon, 
   PlayIcon, 
@@ -18,7 +19,8 @@ import {
   DocumentTextIcon,
   ClipboardDocumentListIcon,
   ChartPieIcon,
-  ClockIcon
+  ClockIcon,
+  BeakerIcon
 } from '@heroicons/react/24/outline'
 
 interface PromptTemplate {
@@ -623,7 +625,8 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
     { id: 'results', label: 'Results', icon: ClipboardList },
     { id: 'analytics', label: 'Analytics', icon: PieChart },
     { id: 'countries', label: 'Countries', icon: Globe },
-    { id: 'schedule', label: 'Schedule', icon: Clock }
+    { id: 'schedule', label: 'Schedule', icon: Clock },
+    { id: 'grounding', label: 'Grounding Test', icon: BeakerIcon }
   ]
 
   return (
@@ -1288,6 +1291,21 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                   You'll be able to run prompt tests daily, weekly, or monthly
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Grounding Test Tab */}
+        {activeTab === 'grounding' && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b">
+              <h3 className="text-lg font-medium">Grounding Test Grid</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Test web search grounding capabilities across GPT-5 and Gemini 2.5 Pro
+              </p>
+            </div>
+            <div className="p-6">
+              <GroundingTestGrid />
             </div>
           </div>
         )}
