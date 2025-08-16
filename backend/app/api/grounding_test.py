@@ -10,20 +10,23 @@ import uuid
 
 from app.llm.orchestrator import LLMOrchestrator
 from app.llm.adapters.types import RunRequest, GroundingMode
+from app.services.als.als_builder import ALSBuilder
 
-router = APIRouter(prefix="/api/grounding-test", tags=["grounding-test"])
+router = APIRouter(tags=["grounding-test"])
 
-# Initialize orchestrator
+# Initialize orchestrator and ALS builder
 orchestrator = LLMOrchestrator(
     gcp_project="contestra-ai",
     vertex_region="europe-west4"
 )
+als_builder = ALSBuilder()
 
 class LocaleTestRequest(BaseModel):
-    """Request for locale test"""
+    """Request for locale test with grounding mode"""
     provider: str  # 'openai' or 'vertex'
     model: str
     grounded: bool
+    grounding_mode: Optional[str] = "preferred"  # 'preferred' or 'required'
     country: str
     als_block: str
     expected: Dict[str, Any]
@@ -31,6 +34,7 @@ class LocaleTestRequest(BaseModel):
 class LocaleTestResponse(BaseModel):
     """Response from locale test"""
     success: bool
+    grounding_mode: str
     grounded_effective: bool
     tool_call_count: int
     json_valid: bool
@@ -63,8 +67,13 @@ async def run_locale_test(request: LocaleTestRequest):
     Run a single locale test using the production orchestrator
     """
     try:
-        # Determine grounding mode
-        grounding_mode = GroundingMode.REQUIRED if request.grounded else GroundingMode.OFF
+        # Determine grounding mode based on request
+        if not request.grounded:
+            grounding_mode = GroundingMode.OFF
+        elif request.grounding_mode and request.grounding_mode.lower() == "required":
+            grounding_mode = GroundingMode.REQUIRED
+        else:
+            grounding_mode = GroundingMode.PREFERRED
         
         # Build system text
         system_text = (
@@ -80,6 +89,12 @@ async def run_locale_test(request: LocaleTestRequest):
             "and emergency phone numbers (array)."
         )
         
+        # Use proper ALS block from templates if a simple one was provided
+        als_block = request.als_block
+        if als_block and als_block.startswith("[ALS]\nOperating from"):
+            # This is the simple placeholder, replace with proper ALS
+            als_block = als_builder.build_als_block(request.country)
+        
         # Create run request
         run_req = RunRequest(
             run_id=str(uuid.uuid4()),
@@ -88,7 +103,7 @@ async def run_locale_test(request: LocaleTestRequest):
             model_name=request.model,
             grounding_mode=grounding_mode,
             system_text=system_text,
-            als_block=request.als_block,
+            als_block=als_block,
             user_prompt=user_prompt,
             temperature=0.0,
             seed=42,
@@ -125,6 +140,7 @@ async def run_locale_test(request: LocaleTestRequest):
         
         return LocaleTestResponse(
             success=success,
+            grounding_mode=grounding_mode.value,
             grounded_effective=result.grounded_effective,
             tool_call_count=result.tool_call_count,
             json_valid=result.json_valid,
@@ -137,8 +153,15 @@ async def run_locale_test(request: LocaleTestRequest):
         )
         
     except Exception as e:
+        # Try to get grounding_mode from locals or default to "off"
+        try:
+            mode = grounding_mode.value if 'grounding_mode' in locals() else "off"
+        except:
+            mode = "off"
+            
         return LocaleTestResponse(
             success=False,
+            grounding_mode=mode,
             grounded_effective=False,
             tool_call_count=0,
             json_valid=False,
@@ -147,15 +170,37 @@ async def run_locale_test(request: LocaleTestRequest):
             error=str(e)
         )
 
+@router.get("/als-block/{country_code}")
+async def get_als_block(country_code: str):
+    """
+    Get the proper ALS block for a specific country
+    """
+    als_block = als_builder.build_als_block(country_code)
+    if not als_block:
+        return {"error": f"Country {country_code} not supported"}
+    return {
+        "country_code": country_code,
+        "als_block": als_block
+    }
+
 @router.get("/test-grid-data")
 async def get_test_grid_data():
     """
     Get configuration data for the test grid UI
+    Three modes represent real user behavior:
+    - Ungrounded: Pure model recall (baseline)
+    - Grounded (Auto): Realistic browsing (model decides)
+    - Grounded (Required): Upper bound (forced search)
     """
     return {
         "providers": [
             {"id": "openai", "name": "OpenAI", "models": ["gpt-5", "gpt-5-mini", "gpt-5-nano"]},
             {"id": "vertex", "name": "Vertex AI", "models": ["gemini-2.5-pro", "gemini-2.5-flash"]}
+        ],
+        "grounding_modes": [
+            {"id": "off", "name": "Ungrounded", "description": "Pure model recall - baseline brand memory"},
+            {"id": "preferred", "name": "Grounded (Auto)", "description": "Realistic - model decides when to search"},
+            {"id": "required", "name": "Grounded (Required)", "description": "Upper bound - forces web search"}
         ],
         "countries": [
             {
@@ -200,3 +245,52 @@ async def get_test_grid_data():
             }
         ]
     }
+
+@router.post("/calculate-metrics")
+async def calculate_metrics(runs: List[LocaleTestResponse]):
+    """
+    Calculate aggregate metrics from test runs
+    Returns visibility rates, grounding effectiveness, and uplift metrics
+    """
+    if not runs:
+        return {"error": "No runs provided"}
+    
+    # Group by grounding mode
+    ungrounded = [r for r in runs if r.grounding_mode == "off"]
+    auto = [r for r in runs if r.grounding_mode == "preferred"]
+    required = [r for r in runs if r.grounding_mode == "required"]
+    
+    def calculate_mode_metrics(mode_runs):
+        if not mode_runs:
+            return {
+                "count": 0,
+                "success_rate": 0,
+                "grounding_effectiveness": 0,
+                "avg_tool_calls": 0,
+                "avg_latency_ms": 0
+            }
+        
+        return {
+            "count": len(mode_runs),
+            "success_rate": sum(1 for r in mode_runs if r.success) / len(mode_runs),
+            "grounding_effectiveness": sum(1 for r in mode_runs if r.grounded_effective) / len(mode_runs),
+            "avg_tool_calls": sum(r.tool_call_count for r in mode_runs) / len(mode_runs),
+            "avg_latency_ms": sum(r.latency_ms for r in mode_runs) / len(mode_runs)
+        }
+    
+    metrics = {
+        "ungrounded": calculate_mode_metrics(ungrounded),
+        "grounded_auto": calculate_mode_metrics(auto),
+        "grounded_required": calculate_mode_metrics(required),
+        "uplift": {}
+    }
+    
+    # Calculate uplift if we have baseline
+    if ungrounded and metrics["ungrounded"]["success_rate"] > 0:
+        baseline = metrics["ungrounded"]["success_rate"]
+        if auto:
+            metrics["uplift"]["auto_vs_baseline"] = metrics["grounded_auto"]["success_rate"] - baseline
+        if required:
+            metrics["uplift"]["ceiling_vs_baseline"] = metrics["grounded_required"]["success_rate"] - baseline
+    
+    return metrics

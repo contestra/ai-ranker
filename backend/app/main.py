@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.api import experiments, prompts, entities, metrics, dashboard, tracked_phrases, simple_analysis, real_analysis, embedding_analysis, comprehensive_analysis, pure_beeb, weekly_tracking, entity_extraction_beeb, contestra_v2_analysis, llm_crawlability, concordance_analysis, hybrid_analysis, brand_entity_strength, brand_entity_strength_v2, crawler_monitor, domains, crawler_monitor_v2, bot_analytics, prompt_tracking, prompt_tracking_celery, prompt_tracking_background, prompt_integrity, health, countries
+from app.api import experiments, prompts, entities, metrics, dashboard, tracked_phrases, simple_analysis, real_analysis, embedding_analysis, comprehensive_analysis, pure_beeb, weekly_tracking, entity_extraction_beeb, contestra_v2_analysis, llm_crawlability, concordance_analysis, hybrid_analysis, brand_entity_strength, brand_entity_strength_v2, crawler_monitor, domains, crawler_monitor_v2, bot_analytics, prompt_tracking, prompt_tracking_celery, prompt_tracking_background, prompt_integrity, health, countries, prompter_v7, grounding_test
 from app.database import engine, Base
 
 @asynccontextmanager
@@ -53,6 +53,8 @@ app.include_router(prompt_tracking_background.router, tags=["prompt_tracking_bac
 app.include_router(prompt_integrity.router, tags=["prompt_integrity"])
 app.include_router(health.router, tags=["health"])
 app.include_router(countries.router, tags=["countries"])
+app.include_router(prompter_v7.router, tags=["prompter_v7"])
+app.include_router(grounding_test.router, prefix="/api/grounding-test", tags=["grounding_test"])
 
 @app.get("/")
 async def root():

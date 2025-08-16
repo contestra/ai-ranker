@@ -23,7 +23,8 @@ interface SystemHealth {
   database: ServiceStatus;
   cache: ServiceStatus;
   openai: ServiceStatus;
-  gemini: ServiceStatus;
+  gemini_vertex: ServiceStatus;
+  gemini_direct: ServiceStatus;
   background_runner: ServiceStatus;
   langchain: ServiceStatus;
 }
@@ -34,7 +35,8 @@ export default function SystemStatus() {
     database: { name: 'SQLite DB', status: 'checking', icon: CircleStackIcon },
     cache: { name: 'Upstash Redis', status: 'checking', icon: CloudIcon },
     openai: { name: 'GPT-5', status: 'checking', icon: CpuChipIcon },
-    gemini: { name: 'Gemini 2.5', status: 'checking', icon: CpuChipIcon },
+    gemini_vertex: { name: 'Gemini Vertex AI', status: 'checking', icon: CloudIcon },
+    gemini_direct: { name: 'Gemini Direct API', status: 'checking', icon: CpuChipIcon },
     background_runner: { name: 'Task Runner', status: 'checking', icon: ArrowPathIcon },
     langchain: { name: 'LangChain/LangSmith', status: 'checking', icon: CloudIcon }
   });
@@ -42,10 +44,17 @@ export default function SystemStatus() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastCheckTime, setLastCheckTime] = useState<string | null>(null);
 
-  const checkHealth = async () => {
+  const checkHealth = async (forceRefresh = false) => {
     setIsRefreshing(true);
     
     try {
+      // If forcing refresh, clear the backend cache first
+      if (forceRefresh) {
+        await fetch('http://localhost:8000/api/health/refresh', { method: 'POST' });
+        // Wait a moment for the cache to clear
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       // Check backend health
       const response = await fetch('http://localhost:8000/api/health');
       const data = await response.json();
@@ -76,11 +85,18 @@ export default function SystemStatus() {
           message: data.models?.openai?.message,
           icon: CpuChipIcon
         },
-        gemini: {
-          name: 'Gemini 2.5',
-          status: data.models?.gemini?.status || 'offline',
-          latency: data.models?.gemini?.avg_response_time_ms,
-          message: data.models?.gemini?.message,
+        gemini_vertex: {
+          name: 'Gemini Vertex AI',
+          status: data.models?.vertex?.status || 'offline',
+          latency: data.models?.vertex?.avg_response_time_ms,
+          message: data.models?.vertex?.message || 'Requires gcloud auth',
+          icon: CloudIcon
+        },
+        gemini_direct: {
+          name: 'Gemini Direct API',
+          status: data.models?.gemini_direct?.status || 'offline',
+          latency: data.models?.gemini_direct?.avg_response_time_ms,
+          message: data.models?.gemini_direct?.message,
           icon: CpuChipIcon
         },
         background_runner: {
@@ -109,7 +125,8 @@ export default function SystemStatus() {
         database: { ...prev.database, status: 'offline' },
         cache: { ...prev.cache, status: 'offline' },
         openai: { ...prev.openai, status: 'offline' },
-        gemini: { ...prev.gemini, status: 'offline' },
+        gemini_vertex: { ...prev.gemini_vertex, status: 'offline', message: 'Requires gcloud auth' },
+        gemini_direct: { ...prev.gemini_direct, status: 'offline' },
         background_runner: { ...prev.background_runner, status: 'offline' },
         langchain: { ...prev.langchain, status: 'offline' }
       }));
@@ -171,7 +188,8 @@ export default function SystemStatus() {
   };
 
   const ServiceRow = ({ service }: { service: ServiceStatus }) => {
-    const Icon = service.icon;
+    if (!service) return null;
+    const Icon = service.icon || ServerIcon;
     
     return (
       <div className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded">
@@ -202,8 +220,9 @@ export default function SystemStatus() {
       <div className="px-4 py-3 border-b flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900">System Status</h3>
         <button
-          onClick={checkHealth}
+          onClick={() => checkHealth(true)}
           disabled={isRefreshing}
+          title="Force refresh (clears cache)"
           className="p-1 hover:bg-gray-100 rounded"
         >
           <ArrowPathIcon className={`w-4 h-4 text-gray-500 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -232,8 +251,9 @@ export default function SystemStatus() {
           
           <div className="border-t my-2" />
           <div className="text-xs font-semibold text-gray-500 px-3 py-1">AI Models</div>
-          <ServiceRow service={health.gemini} />
           <ServiceRow service={health.openai} />
+          <ServiceRow service={health.gemini_vertex} />
+          <ServiceRow service={health.gemini_direct} />
           
           <div className="border-t my-2" />
           <div className="text-xs font-semibold text-gray-500 px-3 py-1">Services</div>

@@ -127,7 +127,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
     prompt_type: 'custom',
     model_name: 'gemini',  // Default model for the template
     countries: ['NONE'],  // Default to base model testing
-    grounding_modes: ['none']
+    grounding_modes: ['off']  // Updated to use new grounding mode
   })
   
   // Model selection state - for running tests only
@@ -421,7 +421,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
           prompt_type: 'custom',
           model_name: 'gemini',  // Include model_name in reset
           countries: ['NONE'],
-          grounding_modes: ['none']
+          grounding_modes: ['off']  // Updated to new grounding mode
         })
         setEditingTemplate(null)
       } else if (response.status === 409) {
@@ -514,7 +514,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
       prompt_text: '',
       prompt_type: 'custom',
       countries: ['NONE'],
-      grounding_modes: ['none']
+      grounding_modes: ['off']  // Updated to new grounding mode
     })
     setEditingTemplate(null)
   }
@@ -821,7 +821,7 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                                   prompt_type: 'custom',
                                   model_name: 'gemini',
                                   countries: ['NONE'],
-                                  grounding_modes: ['none']
+                                  grounding_modes: ['off']  // Updated to new grounding mode
                                 })
                                 setDuplicateCheck({ checking: false, isDuplicate: false })
                               }
@@ -890,38 +890,54 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
 
                   <div>
                     <label className="field-label">Grounding Modes</label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button
                         onClick={() => {
-                          const updated = newTemplate.grounding_modes.includes('none')
-                            ? newTemplate.grounding_modes.filter(m => m !== 'none')
-                            : [...newTemplate.grounding_modes, 'none']
+                          const updated = newTemplate.grounding_modes.includes('off')
+                            ? newTemplate.grounding_modes.filter(m => m !== 'off')
+                            : [...newTemplate.grounding_modes, 'off']
                           setNewTemplate({ ...newTemplate, grounding_modes: updated })
                         }}
                         className={`flex items-center px-3 py-1 rounded-[50px] text-sm font-display transition-all duration-200 ${
-                          newTemplate.grounding_modes.includes('none')
+                          newTemplate.grounding_modes.includes('off')
                             ? 'bg-white text-contestra-gray-900 border border-contestra-gray-900'
                             : 'bg-white text-contestra-text-meta border border-black/[0.06] hover:bg-contestra-gray-100'
                         }`}
                       >
                         <CircleStackIcon className="w-4 h-4 mr-1" />
-                        Model Knowledge Only
+                        Ungrounded (Off)
                       </button>
                       <button
                         onClick={() => {
-                          const updated = newTemplate.grounding_modes.includes('web')
-                            ? newTemplate.grounding_modes.filter(m => m !== 'web')
-                            : [...newTemplate.grounding_modes, 'web']
+                          const updated = newTemplate.grounding_modes.includes('preferred')
+                            ? newTemplate.grounding_modes.filter(m => m !== 'preferred')
+                            : [...newTemplate.grounding_modes, 'preferred']
                           setNewTemplate({ ...newTemplate, grounding_modes: updated })
                         }}
                         className={`flex items-center px-3 py-1 rounded-[50px] text-sm font-display transition-all duration-200 ${
-                          newTemplate.grounding_modes.includes('web')
+                          newTemplate.grounding_modes.includes('preferred')
                             ? 'bg-white text-contestra-gray-900 border border-contestra-gray-900'
                             : 'bg-white text-contestra-text-meta border border-black/[0.06] hover:bg-contestra-gray-100'
                         }`}
                       >
                         <GlobeAltIcon className="w-4 h-4 mr-1" />
-                        Grounded (Web Search)
+                        Grounded (Auto)
+                      </button>
+                      <button
+                        onClick={() => {
+                          const updated = newTemplate.grounding_modes.includes('required')
+                            ? newTemplate.grounding_modes.filter(m => m !== 'required')
+                            : [...newTemplate.grounding_modes, 'required']
+                          setNewTemplate({ ...newTemplate, grounding_modes: updated })
+                        }}
+                        className={`flex items-center px-3 py-1 rounded-[50px] text-sm font-display transition-all duration-200 ${
+                          newTemplate.grounding_modes.includes('required')
+                            ? 'bg-white text-contestra-gray-900 border border-contestra-gray-900'
+                            : 'bg-white text-contestra-text-meta border border-black/[0.06] hover:bg-contestra-gray-100'
+                        }`}
+                      >
+                        <ExclamationCircleIcon className="w-4 h-4 mr-1" />
+                        Grounded (Required)
                       </button>
                     </div>
                   </div>
@@ -1022,14 +1038,33 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                       <span>{template.countries.join(', ')}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {template.grounding_modes.includes('none') && (
+                      {template.grounding_modes.includes('off') && (
                         <span className="flex items-center px-2 py-1 bg-gray-100 rounded text-xs">
                           <CircleStackIcon className="w-3 h-3 mr-1" />
-                          Model Knowledge
+                          Ungrounded
                         </span>
                       )}
-                      {template.grounding_modes.includes('web') && (
+                      {template.grounding_modes.includes('preferred') && (
+                        <span className="flex items-center px-2 py-1 bg-blue-100 rounded text-xs">
+                          <GlobeAltIcon className="w-3 h-3 mr-1" />
+                          Auto
+                        </span>
+                      )}
+                      {template.grounding_modes.includes('required') && (
+                        <span className="flex items-center px-2 py-1 bg-amber-100 rounded text-xs">
+                          <ExclamationCircleIcon className="w-3 h-3 mr-1" />
+                          Required
+                        </span>
+                      )}
+                      {/* Legacy support for old templates - only show if new modes aren't present */}
+                      {!template.grounding_modes.includes('off') && template.grounding_modes.includes('none') && (
                         <span className="flex items-center px-2 py-1 bg-gray-100 rounded text-xs">
+                          <CircleStackIcon className="w-3 h-3 mr-1" />
+                          Ungrounded
+                        </span>
+                      )}
+                      {!template.grounding_modes.includes('preferred') && !template.grounding_modes.includes('required') && template.grounding_modes.includes('web') && (
+                        <span className="flex items-center px-2 py-1 bg-blue-100 rounded text-xs">
                           <GlobeAltIcon className="w-3 h-3 mr-1" />
                           Grounded
                         </span>
@@ -1083,11 +1118,20 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                         <div>
                           <p className="font-medium">{run.template_name || getTemplateName(run.template_id)}</p>
                           <p className="text-sm text-gray-500">
-                            {run.country_code === 'NONE' ? 'Base Model' : run.country_code} • {run.grounding_mode === 'none' ? 'Model Knowledge' : 'Grounded'} • {run.model_name}
+                            {run.country_code === 'NONE' ? 'Base Model' : run.country_code} • {
+                              run.grounding_mode === 'off' || run.grounding_mode === 'none' ? 'Ungrounded' :
+                              run.grounding_mode === 'preferred' || run.grounding_mode === 'web' ? 'Grounded (Auto)' :
+                              run.grounding_mode === 'required' ? 'Grounded (Required)' :
+                              run.grounding_mode
+                            } • {run.model_name}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* Show warning icon if result had issues */}
+                        {expandedResults[run.id] && (expandedResults[run.id].content_filtered || expandedResults[run.id].finish_reason === 'length') && (
+                          <ExclamationCircleIcon className="w-5 h-5 text-yellow-500" title="Response had issues - click to view details" />
+                        )}
                         <button
                           onClick={() => fetchResult(run.id)}
                           className="px-4 py-2 bg-contestra-blue text-white rounded-[50px] hover:opacity-90 text-sm font-mono tracking-[0.02em] transition-all duration-200"
@@ -1124,7 +1168,37 @@ export default function PromptTracking({ brandName, brandId }: PromptTrackingPro
                                 {expandedResults[run.id].model_response}
                               </pre>
                             </div>
+                            {/* Safety metadata display */}
+                            {(expandedResults[run.id].finish_reason || expandedResults[run.id].content_filtered) && (
+                              <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                                <div className="flex items-start gap-2">
+                                  <ExclamationCircleIcon className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                                  <div className="text-sm">
+                                    {expandedResults[run.id].content_filtered ? (
+                                      <p className="font-semibold text-yellow-800">Content was filtered</p>
+                                    ) : expandedResults[run.id].finish_reason === 'length' ? (
+                                      <p className="font-semibold text-yellow-800">Response truncated (token limit reached)</p>
+                                    ) : expandedResults[run.id].finish_reason === 'stop' ? (
+                                      <p className="text-green-700">Response completed normally</p>
+                                    ) : (
+                                      <p className="text-yellow-800">Finish reason: {expandedResults[run.id].finish_reason}</p>
+                                    )}
+                                    {expandedResults[run.id].content_filtered && expandedResults[run.id].finish_reason === 'length' && (
+                                      <p className="text-xs text-gray-600 mt-1">
+                                        This may indicate token starvation - try increasing max tokens to 4000+
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             <div className="text-xs text-gray-500 mt-3 pt-3 border-t">
+                              Grounding Mode: {
+                                run.grounding_mode === 'off' || run.grounding_mode === 'none' ? 'Ungrounded' :
+                                run.grounding_mode === 'preferred' || run.grounding_mode === 'web' ? 'Grounded (Auto)' :
+                                run.grounding_mode === 'required' ? 'Grounded (Required)' :
+                                run.grounding_mode
+                              } • 
                               Brand mentioned: {expandedResults[run.id].brand_mentioned ? 'Yes' : 'No'} • 
                               Mention count: {expandedResults[run.id].mention_count} • 
                               Confidence: {(expandedResults[run.id].confidence_score * 100).toFixed(0)}%

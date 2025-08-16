@@ -486,14 +486,8 @@ async def run_prompt(request: PromptRunRequest):
                     # Prepare prompt based on mode
                     if country_num == 0:  # NONE
                         # Base model testing - no location context at all
-                        if grounding_mode == "web":
-                            full_prompt = f"""Please use web search to answer this question accurately:
-
-{prompt_text}"""
-                        else:
-                            full_prompt = f"""Based only on your training data (do not search the web):
-
-{prompt_text}"""
+                        # Don't add grounding instructions here - let analyze_with_gemini handle it
+                        full_prompt = prompt_text  # Keep prompt naked
                         context_message = None
                     else:
                         # Country-specific testing - Ambient Block as SEPARATE message
@@ -502,15 +496,8 @@ async def run_prompt(request: PromptRunRequest):
                             full_prompt = prompt_text  # UNMODIFIED user prompt
                             context_message = ambient_block  # Ambient Block as separate message
                         else:
-                            # Fallback if no evidence pack
-                            if grounding_mode == "web":
-                                full_prompt = f"""Please use web search to answer this question accurately:
-
-{prompt_text}"""
-                            else:
-                                full_prompt = f"""Based only on your training data (do not search the web):
-
-{prompt_text}"""
+                            # Fallback if no ambient block - still keep prompt naked
+                            full_prompt = prompt_text  # Keep prompt naked
                             context_message = None
                     
                     # DEBUG: Log what we're about to send
@@ -540,13 +527,14 @@ async def run_prompt(request: PromptRunRequest):
                             context=context_message  # Context as separate parameter
                         )
                     elif request.model_name in ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini"]:
-                        # Use GPT models (note: GPT-5 models currently return empty responses)
+                        # Use GPT models with REAL grounding support now!
                         response_data = await adapter.analyze_with_gpt4(
                             full_prompt,  # Naked prompt
                             model_name=request.model_name,
                             temperature=temperature,
                             seed=seed,
-                            context=context_message  # Context as separate parameter
+                            context=context_message,  # Context as separate parameter
+                            use_grounding=(grounding_mode == "web")  # NOW ACTUALLY WORKS!
                         )
                     else:
                         # Default fallback to Gemini
@@ -560,6 +548,15 @@ async def run_prompt(request: PromptRunRequest):
                     
                     # Extract response content and metadata
                     response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
+                    
+                    # Extract grounding metadata
+                    tool_call_count = response_data.get("tool_call_count", 0) if isinstance(response_data, dict) else 0
+                    grounded_effective = response_data.get("grounded_effective", False) if isinstance(response_data, dict) else False
+                    json_valid = response_data.get("json_valid", None) if isinstance(response_data, dict) else None
+                    
+                    # Extract safety and completion metadata
+                    finish_reason = response_data.get("finish_reason", None) if isinstance(response_data, dict) else None
+                    content_filtered = response_data.get("content_filtered", False) if isinstance(response_data, dict) else False
                     
                     # Analyze the response for brand mentions
                     brand_mentioned = request.brand_name.lower() in response.lower()
@@ -584,9 +581,11 @@ async def run_prompt(request: PromptRunRequest):
                         result_query = text("""
                             INSERT INTO prompt_results 
                             (run_id, prompt_text, prompt_hash, model_response, brand_mentioned, mention_count, 
-                             competitors_mentioned, confidence_score)
+                             competitors_mentioned, confidence_score, tool_call_count, grounded_effective, json_valid,
+                             finish_reason, content_filtered)
                             VALUES (:run_id, :prompt, :hash, :response, :mentioned, :count, 
-                                    :competitors, :confidence)
+                                    :competitors, :confidence, :tool_calls, :grounded, :json_ok,
+                                    :finish_reason, :content_filtered)
                             RETURNING id
                         """)
                         
@@ -602,7 +601,12 @@ async def run_prompt(request: PromptRunRequest):
                             "mentioned": brand_mentioned,
                             "count": mention_count,
                             "competitors": competitors_json,
-                            "confidence": 0.8 if brand_mentioned else 0.3
+                            "confidence": 0.8 if brand_mentioned else 0.3,
+                            "tool_calls": tool_call_count,
+                            "grounded": grounded_effective,
+                            "json_ok": json_valid,
+                            "finish_reason": finish_reason,
+                            "content_filtered": content_filtered
                         })
                         
                         # Update run status
@@ -738,6 +742,10 @@ async def get_run_results(run_id: int):
         system_fingerprint = result.system_fingerprint if hasattr(result, 'system_fingerprint') and result.system_fingerprint else None
         model_version = result.model_version if hasattr(result, 'model_version') and result.model_version else None
         
+        # Get safety metadata
+        finish_reason = result.finish_reason if hasattr(result, 'finish_reason') and result.finish_reason else None
+        content_filtered = result.content_filtered if hasattr(result, 'content_filtered') else False
+        
         return {
             "run": {
                 "id": run.id,
@@ -758,7 +766,9 @@ async def get_run_results(run_id: int):
                 "prompt_hash": prompt_hash_short,
                 "prompt_hash_full": prompt_hash,
                 "system_fingerprint": system_fingerprint,
-                "model_version": model_version
+                "model_version": model_version,
+                "finish_reason": finish_reason,
+                "content_filtered": content_filtered
             }
         }
 

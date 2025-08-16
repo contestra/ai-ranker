@@ -4,10 +4,12 @@ Production-grade implementation with grounding and structured outputs
 Following ChatGPT's reference architecture
 """
 
+import os
 import json
 import time
 import logging
 from typing import Dict, Any, Optional
+import google.auth
 from google import genai
 from google.genai.types import (
     GenerateContentConfig, Tool, GoogleSearch, Schema, Type, HttpOptions
@@ -22,28 +24,34 @@ class VertexGenAIAdapter:
     Supports grounding via GoogleSearch and structured JSON outputs
     """
     
-    def __init__(self, project: str, location: str):
+    def __init__(self, project: Optional[str] = None, location: Optional[str] = None):
         """
         Initialize Vertex client
         
         Args:
-            project: GCP project ID (e.g., 'contestra-ai')
-            location: Vertex region (e.g., 'europe-west4')
+            project: GCP project ID (defaults to VERTEX_PROJECT env or 'contestra-ai')
+            location: Vertex region (defaults to VERTEX_LOCATION env or 'europe-west4')
         """
-        # Enforce correct project
-        assert project == "contestra-ai", f"Vertex adapter misconfigured: project={project} != contestra-ai"
+        # Use environment variables with sensible defaults
+        self.project = project or os.getenv("VERTEX_PROJECT", "contestra-ai")
+        self.location = location or os.getenv("VERTEX_LOCATION", "europe-west4")
         
-        self.project = project
-        # Use 'global' location for better grounding support per ChatGPT
-        self.location = "global" if location == "europe-west4" else location
-        # Use API v1 for better grounding support
+        # Check ADC project matches configured project
+        try:
+            _, adc_project = google.auth.default()
+            if adc_project and adc_project != self.project:
+                logger.warning(f"ADC project {adc_project} != configured project {self.project}")
+        except Exception as e:
+            logger.debug(f"Could not check ADC project: {e}")
+        
+        # Initialize client with v1 API for better grounding support
         self.client = genai.Client(
             http_options=HttpOptions(api_version="v1"),
             vertexai=True, 
-            project=project, 
+            project=self.project, 
             location=self.location
         )
-        logger.info(f"Initialized Vertex adapter: project={project}, location={self.location}, api_version=v1")
+        logger.info(f"Initialized Vertex adapter: project={self.project}, location={self.location}, api_version=v1")
     
     @staticmethod
     def _strip_code_fences(s: str) -> str:
@@ -362,6 +370,10 @@ class VertexGenAIAdapter:
         except Exception as e:
             logger.error(f"Vertex API error: {e}")
             
+            # Re-raise authentication errors so fallback can work
+            if "Reauthentication is needed" in str(e) or "ADC" in str(e) or "auth" in str(e).lower():
+                raise  # Let the caller handle auth failures
+            
             # Fail closed for REQUIRED mode
             if req.grounding_mode == GroundingMode.REQUIRED:
                 raise
@@ -393,3 +405,53 @@ class VertexGenAIAdapter:
         import asyncio
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.run, req)
+    
+    async def analyze_with_gemini(
+        self,
+        prompt: str,
+        use_grounding: bool = False,
+        model_name: str = "gemini-2.5-pro",
+        temperature: float = 0.0,
+        seed: int = 42,
+        context: str = None,
+        top_p: float = 1.0
+    ) -> Dict[str, Any]:
+        """
+        Compatibility method for old interface used by Templates tab
+        Converts old-style call to new RunRequest format
+        """
+        import uuid
+        
+        # Create a RunRequest from old-style parameters
+        req = RunRequest(
+            run_id=str(uuid.uuid4()),
+            client_id="legacy_templates",
+            provider="vertex",
+            model_name=model_name,
+            grounding_mode=GroundingMode.REQUIRED if use_grounding else GroundingMode.OFF,
+            system_text="",
+            als_block=context or "",
+            user_prompt=prompt,
+            temperature=temperature,
+            seed=seed,
+            top_p=top_p
+        )
+        
+        # Run and convert result
+        result = await self.run_async(req)
+        
+        # Convert RunResult back to old format
+        # Use json_text for text content, or json_obj if structured
+        content = result.json_text if result.json_text else str(result.json_obj or "")
+        
+        return {
+            "content": content,
+            "model_version": result.system_fingerprint,  # Use system_fingerprint for model version
+            "grounded": result.grounded_effective,
+            "grounding_metadata": {"search_performed": True} if result.grounded_effective else None,
+            "temperature": temperature,
+            "seed": seed,
+            "response_time_ms": result.latency_ms,
+            "token_count": result.usage or {},  # Use usage instead of token_count
+            "system_fingerprint": result.system_fingerprint
+        }

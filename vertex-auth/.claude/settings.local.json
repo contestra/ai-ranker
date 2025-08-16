@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(npm run dev:*)",
+      "Bash(tasklist)",
+      "Bash(taskkill:*)",
+      "Bash(kill:*)",
+      "Bash(timeout 2 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(powershell:*)",
+      "Bash(set PYTHONUNBUFFERED=1)",
+      "Bash(timeout:*)",
+      "Bash(start http://localhost:3001)",
+      "Bash(pip install:*)",
+      "Bash(copy appllmadaptersopenai_adapter.py appllmadaptersopenai_adapter_backup.py)",
+      "Bash(cp:*)",
+      "Bash(set PYTHONUTF8=1)",
+      "Bash(dir:*)",
+      "Bash(git add:*)"
+    ],
+    "additionalDirectories": [
+      "D:\\d\\OneDrive\\CONTESTRA\\Microapps\\ai-ranker",
+      "D:\\d D:\\OneDrive\\CONTESTRA\\Microapps\\ai-ranker"
+    ]
+  }
+}

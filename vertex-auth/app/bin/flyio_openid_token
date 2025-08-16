@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+import sys, json, subprocess, base64, time
+
+def b64url_decode(data: str) -> bytes:
+    # Pad base64url if necessary
+    rem = len(data) % 4
+    if rem:
+        data += "=" * (4 - rem)
+    return base64.urlsafe_b64decode(data.encode("utf-8"))
+
+def get_token(aud: str) -> str:
+    # Use the local Fly Machines API unix domain socket to request a token
+    # Requires `curl` in the image.
+    cmd = [
+        "curl", "--fail", "--silent", "--show-error",
+        "--unix-socket", "/.fly/api",
+        "-X", "POST", "http://localhost/v1/tokens/oidc",
+        "-H", "content-type: application/json",
+        "--data", json.dumps({"aud": aud}),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if res.returncode != 0:
+        raise RuntimeError(res.stderr.strip() or "curl failed")
+    token = res.stdout.strip()
+    if not token or "." not in token:
+        # Some environments return JSON; try to parse
+        try:
+            maybe = json.loads(token)
+            token = maybe.get("id_token") or maybe.get("token") or ""
+        except Exception:
+            pass
+    if not token or "." not in token:
+        raise RuntimeError("No OIDC token returned")
+    return token
+
+def main():
+    # Accept audience via argv[1] or env FLY_OIDC_AUD
+    aud = None
+    if len(sys.argv) > 1:
+        aud = sys.argv[1]
+    if not aud:
+        aud = os.environ.get("FLY_OIDC_AUD")
+    if not aud:
+        print(json.dumps({"version":1,"success":False,"code":"400","message":"Missing audience"}))
+        sys.exit(1)
+    try:
+        token = get_token(aud)
+        # Extract exp from JWT payload
+        payload_b64 = token.split(".")[1]
+        payload = json.loads(b64url_decode(payload_b64))
+        exp = int(payload.get("exp", int(time.time()) + 600))
+        out = {
+            "version": 1,
+            "success": True,
+            "token_type": "urn:ietf:params:oauth:token-type:id_token",
+            "id_token": token,
+            "expiration_time": exp
+        }
+        print(json.dumps(out))
+    except Exception as e:
+        print(json.dumps({"version":1,"success":False,"code":"401","message":str(e)}))
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

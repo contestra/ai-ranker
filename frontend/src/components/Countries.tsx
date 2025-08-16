@@ -14,9 +14,15 @@ interface Country {
   gpt5_test_status?: string;
   gpt5_test_date?: string;
   gpt5_test_results?: any;
+  gpt5_grounded_test_status?: string;
+  gpt5_grounded_test_date?: string;
+  gpt5_grounded_test_results?: any;
   gemini_test_status?: string;
   gemini_test_date?: string;
   gemini_test_results?: any;
+  gemini_grounded_test_status?: string;
+  gemini_grounded_test_date?: string;
+  gemini_grounded_test_results?: any;
 }
 
 interface TestResult {
@@ -43,6 +49,7 @@ export default function Countries() {
   const [testProgress, setTestProgress] = useState<{ [key: string]: { current: number; total: number; probe: string } }>({});
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [selectedModel, setSelectedModel] = useState<'gpt5' | 'gemini' | null>(null);
+  const [selectedGrounded, setSelectedGrounded] = useState<boolean>(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCountry, setNewCountry] = useState({
@@ -53,6 +60,49 @@ export default function Countries() {
     civic_keyword: '',
     has_als_support: false
   });
+
+  // Helper functions for expected values per country
+  const getExpectedVAT = (code: string): string => {
+    const vatRates: { [key: string]: string } = {
+      'SG': '9%',
+      'US': '0%',
+      'GB': '20%',
+      'DE': '19%',
+      'FR': '20%',
+      'IT': '22%',
+      'CH': '8.1%',
+      'AE': '5%'
+    };
+    return vatRates[code] || '0%';
+  };
+
+  const getExpectedPlugs = (code: string): string[] => {
+    const plugTypes: { [key: string]: string[] } = {
+      'SG': ['G'],
+      'US': ['A', 'B'],
+      'GB': ['G'],
+      'DE': ['F', 'C'],
+      'FR': ['E', 'F', 'C'],
+      'IT': ['L', 'F', 'C'],
+      'CH': ['J', 'C'],
+      'AE': ['G', 'C', 'D']
+    };
+    return plugTypes[code] || ['A'];
+  };
+
+  const getExpectedEmergency = (code: string): string[] => {
+    const emergency: { [key: string]: string[] } = {
+      'SG': ['999', '995'],
+      'US': ['911'],
+      'GB': ['999', '112'],
+      'DE': ['112', '110'],
+      'FR': ['112', '15', '17', '18'],
+      'IT': ['112', '113'],
+      'CH': ['112', '117', '118'],
+      'AE': ['999', '998']
+    };
+    return emergency[code] || ['911'];
+  };
 
   useEffect(() => {
     fetchCountries();
@@ -70,32 +120,117 @@ export default function Countries() {
     }
   };
 
-  const testCountry = async (countryCode: string, model: 'gpt5' | 'gemini') => {
-    const testKey = `${countryCode}-${model}`;
+  const runAllTests = async () => {
+    // Test all countries with all 4 combinations
+    for (const country of countries) {
+      // Run 4 tests per country
+      await testCountry(country.code, 'gpt5', false);  // GPT-5 Ungrounded
+      await testCountry(country.code, 'gpt5', true);   // GPT-5 Grounded
+      await testCountry(country.code, 'gemini', false); // Gemini Ungrounded
+      await testCountry(country.code, 'gemini', true);  // Gemini Grounded
+    }
+  };
+
+  const testCountry = async (countryCode: string, model: 'gpt5' | 'gemini', grounded: boolean = false) => {
+    const testKey = `${countryCode}-${model}${grounded ? '-grounded' : ''}`;
     
     // Prevent duplicate tests
     if (testing[testKey]) {
-      console.log(`Test already running for ${countryCode} with ${model}`);
+      console.log(`Test already running for ${countryCode} with ${model} (grounded: ${grounded})`);
       return;
     }
     
     setTesting(prev => ({ ...prev, [testKey]: true }));
     setTestProgress(prev => ({ 
       ...prev, 
-      [testKey]: { current: 0, total: 1, probe: 'Locale Check' }
+      [testKey]: { current: 0, total: 1, probe: grounded ? 'Grounded Check' : 'Locale Check' }
     }));
 
     try {
-      const response = await fetch('http://localhost:8000/api/countries/test-with-progress', {
+      // Find the country to get its ALS block
+      const country = countries.find(c => c.code === countryCode);
+      if (!country) {
+        throw new Error('Country not found');
+      }
+
+      // Use the grounding test endpoint for both grounded and ungrounded tests
+      const response = await fetch('http://localhost:8000/api/grounding-test/run-locale-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          country_code: countryCode,
-          model: model
+          provider: model === 'gpt5' ? 'openai' : 'vertex',
+          model: model === 'gpt5' ? 'gpt-5' : 'gemini-2.5-pro',
+          grounded: grounded,
+          country: countryCode,
+          als_block: `[ALS]\nOperating from ${country.name}. Local context and regulations apply.`,
+          expected: {
+            vat_percent: getExpectedVAT(countryCode),
+            plug: getExpectedPlugs(countryCode),
+            emergency: getExpectedEmergency(countryCode)
+          }
         })
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Update the country's test results
+        setCountries(prev => prev.map(c => {
+          if (c.code === countryCode) {
+            if (grounded) {
+              // Update grounded test results
+              if (model === 'gpt5') {
+                return {
+                  ...c,
+                  gpt5_grounded_test_status: result.success ? 
+                    (result.passed_vat && result.passed_plug && result.passed_emergency ? 'passed' : 'partial') : 
+                    'failed',
+                  gpt5_grounded_test_date: new Date().toISOString(),
+                  gpt5_grounded_test_results: result
+                };
+              } else {
+                return {
+                  ...c,
+                  gemini_grounded_test_status: result.success ? 
+                    (result.passed_vat && result.passed_plug && result.passed_emergency ? 'passed' : 'partial') : 
+                    'failed',
+                  gemini_grounded_test_date: new Date().toISOString(),
+                  gemini_grounded_test_results: result
+                };
+              }
+            } else {
+              // Update ungrounded test results
+              if (model === 'gpt5') {
+                return {
+                  ...c,
+                  gpt5_test_status: result.success ? 
+                    (result.passed_vat && result.passed_plug && result.passed_emergency ? 'passed' : 'partial') : 
+                    'failed',
+                  gpt5_test_date: new Date().toISOString(),
+                  gpt5_test_results: result
+                };
+              } else {
+                return {
+                  ...c,
+                  gemini_test_status: result.success ? 
+                    (result.passed_vat && result.passed_plug && result.passed_emergency ? 'passed' : 'partial') : 
+                    'failed',
+                  gemini_test_date: new Date().toISOString(),
+                  gemini_test_results: result
+                };
+              }
+            }
+          }
+          return c;
+        }));
+        
+        // Clean up the testing state after successful completion
+        setTesting(prev => ({ ...prev, [testKey]: false }));
+        setTestProgress(prev => {
+          const { [testKey]: _, ...rest } = prev;
+          return rest;
+        });
+      } else if (!response.ok) {
         // Fallback to regular test endpoint if progress endpoint not found
         if (response.status === 404) {
           const fallbackResponse = await fetch('http://localhost:8000/api/countries/test', {
@@ -250,9 +385,10 @@ export default function Countries() {
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
-  const showCountryDetails = (country: Country, model: 'gpt5' | 'gemini') => {
+  const showCountryDetails = (country: Country, model: 'gpt5' | 'gemini', grounded: boolean = false) => {
     setSelectedCountry(country);
     setSelectedModel(model);
+    setSelectedGrounded(grounded);
     setShowDetails(true);
   };
 
@@ -268,13 +404,32 @@ export default function Countries() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">Countries</h2>
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-contestra-green text-white rounded-lg hover:bg-green-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Country
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={runAllTests}
+            disabled={Object.keys(testing).length > 0}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {Object.keys(testing).length > 0 ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Run All Tests
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-contestra-green text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Country
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -308,50 +463,39 @@ export default function Countries() {
                     <div className="text-sm font-medium text-gray-900">{country.name}</div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <div className="flex flex-col items-center gap-2">
+                {/* GPT-5 Ungrounded */}
+                <td className="px-3 py-4 whitespace-nowrap text-center">
+                  <div className="flex flex-col items-center gap-1">
                     {country.gpt5_test_status && country.gpt5_test_status !== 'untested' ? (
                       <>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(country.gpt5_test_status)}
-                          <div className="flex items-center gap-1">
-                            {country.gpt5_test_results && (
-                              <button
-                                onClick={() => showCountryDetails(country, 'gpt5')}
-                                className="p-1 text-gray-600 hover:text-contestra-blue hover:bg-gray-100 rounded transition-colors"
-                                title="View test details"
-                              >
-                                <Info className="h-4 w-4" />
-                              </button>
-                            )}
+                        {getStatusIcon(country.gpt5_test_status)}
+                        <div className="flex items-center gap-1">
+                          {country.gpt5_test_results && (
                             <button
-                              onClick={() => testCountry(country.code, 'gpt5')}
-                              disabled={testing[`${country.code}-gpt5`]}
-                              className="p-1 text-gray-600 hover:text-contestra-green hover:bg-gray-100 rounded transition-colors"
-                              title="Retest with GPT-5"
+                              onClick={() => showCountryDetails(country, 'gpt5', false)}
+                              className="p-1 text-gray-600 hover:text-contestra-blue hover:bg-gray-100 rounded transition-colors"
+                              title="View test details"
                             >
-                              {testing[`${country.code}-gpt5`] ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
+                              <Info className="h-4 w-4" />
                             </button>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <span className="text-xs text-gray-500">
-                            {formatTestDate(country.gpt5_test_date).split(' ')[0]}
-                          </span>
-                          {testProgress[`${country.code}-gpt5`] && (
-                            <span className="text-xs text-contestra-blue mt-1">
-                              {testProgress[`${country.code}-gpt5`].probe}
-                            </span>
                           )}
+                          <button
+                            onClick={() => testCountry(country.code, 'gpt5', false)}
+                            disabled={testing[`${country.code}-gpt5`]}
+                            className="p-1 text-gray-600 hover:text-contestra-green hover:bg-gray-100 rounded transition-colors"
+                            title="Retest with GPT-5"
+                          >
+                            {testing[`${country.code}-gpt5`] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </button>
                         </div>
                       </>
                     ) : (
                       <button
-                        onClick={() => testCountry(country.code, 'gpt5')}
+                        onClick={() => testCountry(country.code, 'gpt5', false)}
                         disabled={testing[`${country.code}-gpt5`]}
                         className="px-3 py-1 text-sm bg-contestra-green text-white rounded hover:bg-green-700 disabled:opacity-50"
                       >
@@ -371,50 +515,93 @@ export default function Countries() {
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    {country.gemini_test_status && country.gemini_test_status !== 'untested' ? (
+                
+                {/* GPT-5 Grounded */}
+                <td className="px-3 py-4 whitespace-nowrap text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    {country.gpt5_grounded_test_status && country.gpt5_grounded_test_status !== 'untested' ? (
                       <>
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(country.gemini_test_status)}
-                          <div className="flex items-center gap-1">
-                            {country.gemini_test_results && (
-                              <button
-                                onClick={() => showCountryDetails(country, 'gemini')}
-                                className="p-1 text-gray-600 hover:text-contestra-blue hover:bg-gray-100 rounded transition-colors"
-                                title="View test details"
-                              >
-                                <Info className="h-4 w-4" />
-                              </button>
-                            )}
+                        {getStatusIcon(country.gpt5_grounded_test_status)}
+                        <div className="flex items-center gap-1">
+                          {country.gpt5_grounded_test_results && (
                             <button
-                              onClick={() => testCountry(country.code, 'gemini')}
-                              disabled={testing[`${country.code}-gemini`]}
-                              className="p-1 text-gray-600 hover:text-contestra-green hover:bg-gray-100 rounded transition-colors"
-                              title="Retest with Gemini"
+                              onClick={() => showCountryDetails(country, 'gpt5', true)}
+                              className="p-1 text-gray-600 hover:text-contestra-blue hover:bg-gray-100 rounded transition-colors"
+                              title="View test details"
                             >
-                              {testing[`${country.code}-gemini`] ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
+                              <Info className="h-4 w-4" />
                             </button>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <span className="text-xs text-gray-500">
-                            {formatTestDate(country.gemini_test_date).split(' ')[0]}
-                          </span>
-                          {testProgress[`${country.code}-gemini`] && (
-                            <span className="text-xs text-contestra-blue mt-1">
-                              {testProgress[`${country.code}-gemini`].probe}
-                            </span>
                           )}
+                          <button
+                            onClick={() => testCountry(country.code, 'gpt5', true)}
+                            disabled={testing[`${country.code}-gpt5-grounded`]}
+                            className="p-1 text-gray-600 hover:text-contestra-green hover:bg-gray-100 rounded transition-colors"
+                            title="Retest with GPT-5 (Grounded)"
+                          >
+                            {testing[`${country.code}-gpt5-grounded`] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </button>
                         </div>
                       </>
                     ) : (
                       <button
-                        onClick={() => testCountry(country.code, 'gemini')}
+                        onClick={() => testCountry(country.code, 'gpt5', true)}
+                        disabled={testing[`${country.code}-gpt5-grounded`]}
+                        className="px-3 py-1 text-sm bg-contestra-green text-white rounded hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {testing[`${country.code}-gpt5-grounded`] ? (
+                          <div className="flex items-center gap-1">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {testProgress[`${country.code}-gpt5-grounded`] && (
+                              <span className="text-xs">
+                                {testProgress[`${country.code}-gpt5-grounded`].current}/{testProgress[`${country.code}-gpt5-grounded`].total}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          'Grounded Check'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </td>
+                
+                {/* Gemini Ungrounded */}
+                <td className="px-3 py-4 whitespace-nowrap text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    {country.gemini_test_status && country.gemini_test_status !== 'untested' ? (
+                      <>
+                        {getStatusIcon(country.gemini_test_status)}
+                        <div className="flex items-center gap-1">
+                          {country.gemini_test_results && (
+                            <button
+                              onClick={() => showCountryDetails(country, 'gemini', false)}
+                              className="p-1 text-gray-600 hover:text-contestra-blue hover:bg-gray-100 rounded transition-colors"
+                              title="View test details"
+                            >
+                              <Info className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => testCountry(country.code, 'gemini', false)}
+                            disabled={testing[`${country.code}-gemini`]}
+                            className="p-1 text-gray-600 hover:text-contestra-green hover:bg-gray-100 rounded transition-colors"
+                            title="Retest with Gemini"
+                          >
+                            {testing[`${country.code}-gemini`] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => testCountry(country.code, 'gemini', false)}
                         disabled={testing[`${country.code}-gemini`]}
                         className="px-3 py-1 text-sm bg-contestra-green text-white rounded hover:bg-green-700 disabled:opacity-50"
                       >
@@ -434,6 +621,59 @@ export default function Countries() {
                     )}
                   </div>
                 </td>
+                
+                {/* Gemini Grounded */}
+                <td className="px-3 py-4 whitespace-nowrap text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    {country.gemini_grounded_test_status && country.gemini_grounded_test_status !== 'untested' ? (
+                      <>
+                        {getStatusIcon(country.gemini_grounded_test_status)}
+                        <div className="flex items-center gap-1">
+                          {country.gemini_grounded_test_results && (
+                            <button
+                              onClick={() => showCountryDetails(country, 'gemini', true)}
+                              className="p-1 text-gray-600 hover:text-contestra-blue hover:bg-gray-100 rounded transition-colors"
+                              title="View test details"
+                            >
+                              <Info className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => testCountry(country.code, 'gemini', true)}
+                            disabled={testing[`${country.code}-gemini-grounded`]}
+                            className="p-1 text-gray-600 hover:text-contestra-green hover:bg-gray-100 rounded transition-colors"
+                            title="Retest with Gemini (Grounded)"
+                          >
+                            {testing[`${country.code}-gemini-grounded`] ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Play className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => testCountry(country.code, 'gemini', true)}
+                        disabled={testing[`${country.code}-gemini-grounded`]}
+                        className="px-3 py-1 text-sm bg-contestra-green text-white rounded hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {testing[`${country.code}-gemini-grounded`] ? (
+                          <div className="flex items-center gap-1">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {testProgress[`${country.code}-gemini-grounded`] && (
+                              <span className="text-xs">
+                                {testProgress[`${country.code}-gemini-grounded`].current}/{testProgress[`${country.code}-gemini-grounded`].total}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          'Grounded Check'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -446,7 +686,7 @@ export default function Countries() {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold">
-                {selectedCountry.flag_emoji} {selectedCountry.name} - {selectedModel === 'gpt5' ? 'GPT-5' : 'Gemini'} Test Results
+                {selectedCountry.flag_emoji} {selectedCountry.name} - {selectedModel === 'gpt5' ? 'GPT-5' : 'Gemini 2.5 Pro'} {selectedGrounded ? 'Grounded' : 'Ungrounded'}
               </h3>
               <button
                 onClick={() => setShowDetails(false)}
@@ -456,52 +696,112 @@ export default function Countries() {
               </button>
             </div>
 
-            {/* Show only the selected model's results */}
-            {selectedModel === 'gpt5' && selectedCountry.gpt5_test_results && (
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  Locale Test Results
-                  {getStatusIcon(selectedCountry.gpt5_test_status)}
-                </h4>
-                <div className="space-y-3">
-                  {Object.entries(selectedCountry.gpt5_test_results.probes || {}).map(([key, probe]: [string, any]) => (
-                    <div key={key} className="border-l-4 pl-3 py-1" 
-                         style={{ borderColor: probe.passed ? '#2D8A2D' : '#D96D14' }}>
-                      <div className="text-sm font-medium">{probe.question}</div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        Expected: {probe.expected}
-                      </div>
-                      <div className="text-xs text-gray-800 mt-1">
-                        Found: {probe.found}
-                      </div>
+            {/* Show only the specific test results based on what was clicked */}
+            <div className="space-y-4">
+              {selectedModel === 'gpt5' && !selectedGrounded && selectedCountry.gpt5_test_results && (
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    GPT-5 Ungrounded Results
+                    {getStatusIcon(selectedCountry.gpt5_test_status)}
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="text-sm text-gray-700">
+                      <strong>VAT:</strong> {selectedCountry.gpt5_test_results.json_obj?.vat_percent || 'N/A'} 
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedVAT(selectedCountry.code)})</span>
                     </div>
-                  ))}
+                    <div className="text-sm text-gray-700">
+                      <strong>Plug:</strong> {selectedCountry.gpt5_test_results.json_obj?.plug?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedPlugs(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <strong>Emergency:</strong> {selectedCountry.gpt5_test_results.json_obj?.emergency?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedEmergency(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2 pt-2 border-t">
+                      Grounding: {selectedCountry.gpt5_test_results.grounded_effective ? 'Yes' : 'No'}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {selectedModel === 'gpt5' && selectedGrounded && selectedCountry.gpt5_grounded_test_results && (
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    GPT-5 Grounded Results
+                    {getStatusIcon(selectedCountry.gpt5_grounded_test_status)}
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="text-sm text-gray-700">
+                      <strong>VAT:</strong> {selectedCountry.gpt5_grounded_test_results.json_obj?.vat_percent || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedVAT(selectedCountry.code)})</span>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <strong>Plug:</strong> {selectedCountry.gpt5_grounded_test_results.json_obj?.plug?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedPlugs(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <strong>Emergency:</strong> {selectedCountry.gpt5_grounded_test_results.json_obj?.emergency?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedEmergency(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-sm text-blue-600 mt-3 pt-2 border-t">
+                      🔍 Web searches performed: {selectedCountry.gpt5_grounded_test_results.tool_call_count || 0}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            {selectedModel === 'gemini' && selectedCountry.gemini_test_results && (
-              <div className="border rounded-lg p-4">
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  Locale Test Results
-                  {getStatusIcon(selectedCountry.gemini_test_status)}
-                </h4>
-                <div className="space-y-3">
-                  {Object.entries(selectedCountry.gemini_test_results.probes || {}).map(([key, probe]: [string, any]) => (
-                    <div key={key} className="border-l-4 pl-3 py-1"
-                         style={{ borderColor: probe.passed ? '#2D8A2D' : '#D96D14' }}>
-                      <div className="text-sm font-medium">{probe.question}</div>
-                      <div className="text-xs text-gray-600 mt-1">
-                        Expected: {probe.expected}
-                      </div>
-                      <div className="text-xs text-gray-800 mt-1">
-                        Found: {probe.found}
-                      </div>
+              {selectedModel === 'gemini' && !selectedGrounded && selectedCountry.gemini_test_results && (
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    Gemini Ungrounded Results
+                    {getStatusIcon(selectedCountry.gemini_test_status)}
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="text-sm text-gray-700">
+                      <strong>VAT:</strong> {selectedCountry.gemini_test_results.json_obj?.vat_percent || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedVAT(selectedCountry.code)})</span>
                     </div>
-                  ))}
+                    <div className="text-sm text-gray-700">
+                      <strong>Plug:</strong> {selectedCountry.gemini_test_results.json_obj?.plug?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedPlugs(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <strong>Emergency:</strong> {selectedCountry.gemini_test_results.json_obj?.emergency?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedEmergency(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2 pt-2 border-t">
+                      Grounding: {selectedCountry.gemini_test_results.grounded_effective ? 'Yes' : 'No'}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {selectedModel === 'gemini' && selectedGrounded && selectedCountry.gemini_grounded_test_results && (
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    Gemini Grounded Results
+                    {getStatusIcon(selectedCountry.gemini_grounded_test_status)}
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="text-sm text-gray-700">
+                      <strong>VAT:</strong> {selectedCountry.gemini_grounded_test_results.json_obj?.vat_percent || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedVAT(selectedCountry.code)})</span>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <strong>Plug:</strong> {selectedCountry.gemini_grounded_test_results.json_obj?.plug?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedPlugs(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-sm text-gray-700">
+                      <strong>Emergency:</strong> {selectedCountry.gemini_grounded_test_results.json_obj?.emergency?.join(', ') || 'N/A'}
+                      <span className="text-xs text-gray-500 ml-2">(Expected: {getExpectedEmergency(selectedCountry.code).join(', ')})</span>
+                    </div>
+                    <div className="text-sm text-blue-600 mt-3 pt-2 border-t">
+                      🔍 Web searches performed: {selectedCountry.gemini_grounded_test_results.tool_call_count || 0}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

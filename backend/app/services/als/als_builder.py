@@ -39,7 +39,13 @@ class ALSBuilder:
         try:
             # Use the new render_block method with proper phrase rotation
             import random
-            phrase_idx = random.randint(0, 10) if randomize else 0
+            # Get the actual number of phrases for this country
+            tpl = ALSTemplates.TEMPLATES.get(country.upper())
+            if tpl and tpl.phrases:
+                max_idx = len(tpl.phrases) - 1
+                phrase_idx = random.randint(0, max_idx) if randomize else 0
+            else:
+                phrase_idx = 0
             
             return ALSTemplates.render_block(
                 code=country,

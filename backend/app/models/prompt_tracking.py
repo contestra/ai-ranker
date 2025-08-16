@@ -71,6 +71,16 @@ class PromptResult(Base):
     response_time_ms = Column(Integer)  # Response time in milliseconds
     token_count = Column(JSON)  # {"prompt_tokens": X, "completion_tokens": Y, "total_tokens": Z}
     
+    # Grounding tracking fields
+    tool_call_count = Column(Integer, default=0)  # Number of tool calls made (0 = ungrounded)
+    grounded_effective = Column(Boolean, default=False)  # Whether grounding actually happened
+    json_valid = Column(Boolean, default=True)  # Whether response was valid JSON (for locale probes)
+    als_variant_id = Column(String(50))  # Which ALS variant was used (for A/B testing)
+    
+    # Safety and completion tracking fields
+    finish_reason = Column(String)  # 'stop', 'length', 'content_filter', etc.
+    content_filtered = Column(Boolean, default=False)  # Whether content was filtered
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships

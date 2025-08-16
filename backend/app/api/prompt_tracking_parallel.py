@@ -117,14 +117,38 @@ async def process_single_test(
         brand_mentioned = brand_name.lower() in response.lower()
         mention_count = response.lower().count(brand_name.lower())
         
-        # Save result (simplified schema)
+        # Extract metadata from response_data
+        metadata = {}
+        if isinstance(response_data, dict):
+            # Store important metadata
+            metadata = {
+                "model_version": response_data.get("model_version", model_name),
+                "grounded": response_data.get("grounded", grounding_mode == "web"),
+                "temperature": response_data.get("temperature", temperature),
+                "seed": response_data.get("seed", seed),
+                "response_time_ms": response_data.get("response_time_ms", 0)
+            }
+            # Add grounding metadata if present
+            if "grounding_metadata" in response_data:
+                metadata["grounding_metadata"] = response_data["grounding_metadata"]
+            if "system_fingerprint" in response_data:
+                metadata["system_fingerprint"] = response_data["system_fingerprint"]
+            if "token_count" in response_data:
+                metadata["token_count"] = response_data["token_count"]
+        
+        # Determine if grounding was effective
+        grounded_effective = 1 if (grounding_mode == "web" and metadata.get("grounded", False)) else 0
+        tool_call_count = 1 if metadata.get("grounding_metadata") else 0
+        
+        # Save result with metadata
         with engine.begin() as conn:
             result_query = text("""
                 INSERT INTO prompt_results 
                 (run_id, prompt_text, model_response, brand_mentioned, mention_count, 
-                 competitors_mentioned, confidence_score)
+                 competitors_mentioned, confidence_score, response_metadata, 
+                 grounded_effective, tool_call_count)
                 VALUES (:run_id, :prompt, :response, :mentioned, :count, 
-                        :competitors, :confidence)
+                        :competitors, :confidence, :metadata, :grounded_effective, :tool_calls)
                 RETURNING id
             """)
             
@@ -137,7 +161,10 @@ async def process_single_test(
                 "mentioned": brand_mentioned,
                 "count": mention_count,
                 "competitors": json.dumps([]),
-                "confidence": 0.8 if brand_mentioned else 0.3
+                "confidence": 0.8 if brand_mentioned else 0.3,
+                "metadata": json.dumps(metadata),
+                "grounded_effective": grounded_effective,
+                "tool_calls": tool_call_count
             })
             
             # Update run status

@@ -4,31 +4,133 @@ Ensures prompts haven't been modified between creation and execution.
 """
 
 import hashlib
-from typing import Optional
+import json
+from typing import Optional, Iterable, List
 
-def calculate_prompt_hash(prompt_text: str) -> str:
+def _normalize_prompt_text(s: Optional[str]) -> str:
+    """Normalize prompt text for consistent hashing."""
+    if not s:
+        return ""
+    s = s.strip().replace("\r\n", "\n").replace("\r", "\n")
+    # Collapse multiple spaces
+    return " ".join(s.split())
+
+def _normalize_countries(countries: Optional[Iterable[str]]) -> List[str]:
+    """Normalize and sort country codes."""
+    if not countries:
+        return []
+    out = []
+    for c in countries:
+        if not c:
+            continue
+        cc = str(c).strip().upper()
+        # Handle special cases
+        if cc in {"NONE", "BASE", "BASE MODEL", "NO LOCATION"}:
+            cc = "NONE"  # Our frontend uses "NONE" for base model
+        if cc == "UK":
+            cc = "GB"
+        out.append(cc)
+    return sorted(set(out))
+
+def _normalize_modes(modes: Optional[Iterable[str]]) -> List[str]:
+    """Normalize grounding modes to canonical keys."""
+    # Map various representations to canonical
+    MAP = {
+        "MODEL KNOWLEDGE ONLY": "none",
+        "MODEL_ONLY": "none",
+        "UNGROUNDED": "none",
+        "NONE": "none",
+        "GROUNDED (WEB SEARCH)": "web",
+        "WEB": "web",
+        "WEB_SEARCH": "web",
+        "GROUNDED": "web",
+    }
+    out = []
+    for m in modes or []:
+        if not m:
+            continue
+        k = str(m).strip().upper()
+        k = MAP.get(k, m.lower())  # Use mapping or lowercase original
+        out.append(k)
+    return sorted(set(out))
+
+def calculate_bundle_hash(
+    prompt_text: str,
+    *,
+    model_name: Optional[str] = None,
+    countries: Optional[Iterable[str]] = None,
+    grounding_modes: Optional[Iterable[str]] = None,
+    prompt_type: Optional[str] = None,
+) -> str:
     """
-    Calculate SHA256 hash of prompt text for integrity checking.
+    Calculate hash for a template bundle (prompt + model + countries + modes).
+    This represents the template's identity as a run configuration.
+    
+    NOTE: prompt_type is accepted for backward compatibility but NOT included
+    in the hash since it doesn't affect the AI's output.
     
     Args:
-        prompt_text: The prompt text to hash
+        prompt_text: The prompt text
+        model_name: The AI model name
+        countries: List of country codes
+        grounding_modes: List of grounding modes
+        prompt_type: The prompt type (IGNORED - kept for compatibility)
         
     Returns:
         64-character hex string of SHA256 hash
-        
-    Note:
-        - Uses UTF-8 encoding consistently
-        - Normalizes line endings to \n before hashing
-        - Strips trailing whitespace to avoid false mismatches
     """
+    canonical = {
+        "prompt_text": _normalize_prompt_text(prompt_text),
+        "countries": _normalize_countries(countries),
+        "grounding_modes": _normalize_modes(grounding_modes),
+        "model_name": (model_name or "").strip(),
+        # prompt_type removed - it's just metadata, doesn't affect AI output
+    }
+    payload = json.dumps(canonical, separators=(",", ":"), ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+# Keep the old function for backward compatibility but redirect to bundle hash
+def calculate_prompt_hash(
+    prompt_text: str,
+    model_name: Optional[str] = None,
+    countries: Optional[Iterable[str]] = None,
+    grounding_modes: Optional[Iterable[str]] = None,
+    prompt_type: Optional[str] = None,
+) -> str:
+    """
+    Calculate SHA256 hash for template deduplication.
+    Includes model, countries, and grounding modes for bundle-aware dedup.
+    
+    NOTE: prompt_type is accepted for backward compatibility but NOT included
+    in the hash since it doesn't affect the AI's output.
+    
+    Args:
+        prompt_text: The prompt text to hash
+        model_name: Optional model name for bundle hashing
+        countries: Optional country list for bundle hashing
+        grounding_modes: Optional grounding modes for bundle hashing
+        prompt_type: Optional prompt type (IGNORED - kept for compatibility)
+        
+    Returns:
+        64-character hex string of SHA256 hash
+    """
+    # If additional params provided, use bundle hash
+    if model_name or countries or grounding_modes:
+        return calculate_bundle_hash(
+            prompt_text,
+            model_name=model_name,
+            countries=countries,
+            grounding_modes=grounding_modes,
+            prompt_type=prompt_type  # Passed but ignored in hash calculation
+        )
+    
+    # Legacy behavior for text-only hashing
     if not prompt_text:
         return hashlib.sha256(b'').hexdigest()
     
     # Normalize the prompt for consistent hashing
     normalized = prompt_text.strip()
-    # Replace Windows line endings with Unix
     normalized = normalized.replace('\r\n', '\n')
-    # Replace Mac line endings with Unix
     normalized = normalized.replace('\r', '\n')
     
     # Calculate hash
@@ -122,3 +224,15 @@ def find_duplicate_prompts(prompts: list[dict]) -> dict:
     }
     
     return duplicates
+
+# Export the normalize functions for use in other modules
+__all__ = [
+    'calculate_prompt_hash',
+    'calculate_bundle_hash',
+    'verify_prompt_integrity',
+    'detect_prompt_modification',
+    'find_duplicate_prompts',
+    '_normalize_prompt_text',
+    '_normalize_countries', 
+    '_normalize_modes'
+]

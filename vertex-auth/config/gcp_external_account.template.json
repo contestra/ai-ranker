@@ -1,0 +1,13 @@
+{
+  "type": "external_account",
+  "audience": "${GOOGLE_WIF_AUDIENCE}",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
+  "token_url": "https://sts.googleapis.com/v1/token",
+  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${GOOGLE_IMPERSONATED_SA}:generateAccessToken",
+  "credential_source": {
+    "executable": {
+      "command": "/app/bin/flyio_openid_token ${FLY_OIDC_AUD}",
+      "timeout_millis": 5000
+    }
+  }
+}

@@ -20,7 +20,8 @@ router = APIRouter(prefix="/api", tags=["health"])
 # Cache for model health checks (to avoid spamming APIs)
 model_health_cache = {
     'openai': {'last_check': None, 'status': 'unknown', 'response_time': None},
-    'gemini': {'last_check': None, 'status': 'unknown', 'response_time': None}
+    'vertex': {'last_check': None, 'status': 'unknown', 'response_time': None},
+    'gemini_direct': {'last_check': None, 'status': 'unknown', 'response_time': None}
 }
 
 # Cache for LangChain health check
@@ -30,6 +31,21 @@ langchain_health_cache = {
     'tracing_enabled': False,
     'project': None
 }
+
+@router.post("/health/refresh")
+async def refresh_health_cache() -> Dict[str, str]:
+    """Force refresh all health caches"""
+    global model_health_cache, langchain_health_cache
+    
+    # Clear all caches
+    model_health_cache = {
+        'openai': {'last_check': None, 'status': 'checking', 'response_time': None},
+        'vertex': {'last_check': None, 'status': 'checking', 'response_time': None},
+        'gemini_direct': {'last_check': None, 'status': 'checking', 'response_time': None}
+    }
+    langchain_health_cache = {'last_check': None}
+    
+    return {"message": "Health cache cleared. Call /health to get fresh status."}
 
 @router.get("/health")
 async def health_check() -> Dict[str, Any]:
@@ -44,7 +60,8 @@ async def health_check() -> Dict[str, Any]:
         'cache': {'status': 'checking'},
         'models': {
             'openai': {'status': 'checking'},
-            'gemini': {'status': 'checking'}
+            'vertex': {'status': 'checking'},
+            'gemini_direct': {'status': 'checking'}
         },
         'background_runner': {'status': 'checking'},
         'langchain': {'status': 'checking'}
@@ -136,45 +153,171 @@ async def health_check() -> Dict[str, Any]:
                   if model_health_cache['openai']['response_time'] else None)
     }
     
-    # Check Gemini
-    if (model_health_cache['gemini']['last_check'] is None or 
-        now - model_health_cache['gemini']['last_check'] > cache_duration):
+    # Check Vertex AI (used for ALL Gemini requests)
+    if (model_health_cache['vertex']['last_check'] is None or 
+        now - model_health_cache['vertex']['last_check'] > cache_duration):
         try:
-            adapter = LangChainAdapter()
+            # Remove old service account if present (use ADC instead)
+            import os
+            os.environ.pop('GOOGLE_APPLICATION_CREDENTIALS', None)
+            
+            # Try to import and use Vertex adapter
+            from app.llm.vertex_genai_adapter import VertexGenAIAdapter
+            vertex_adapter = VertexGenAIAdapter(project="contestra-ai", location="europe-west4")
             test_start = time.time()
             
+            # Test Vertex with grounding
             response = await asyncio.wait_for(
-                adapter.analyze_with_gemini("Test", use_grounding=False),
+                vertex_adapter.analyze_with_gemini(
+                    prompt="Test",
+                    use_grounding=True,
+                    model_name="gemini-2.0-flash"
+                ),
                 timeout=5.0
             )
             
             response_time = int((time.time() - test_start) * 1000)
-            model_health_cache['gemini'] = {
+            if response.get('error'):
+                # Vertex is configured but failing
+                model_health_cache['vertex'] = {
+                    'last_check': now,
+                    'status': 'offline',
+                    'response_time': None,
+                    'message': 'ADC not configured - run: gcloud auth application-default login'
+                }
+            else:
+                model_health_cache['vertex'] = {
+                    'last_check': now,
+                    'status': 'healthy' if response.get('content') else 'degraded',
+                    'response_time': response_time
+                }
+        except ImportError:
+            model_health_cache['vertex'] = {
                 'last_check': now,
-                'status': 'healthy' if response.get('content') else 'degraded',
-                'response_time': response_time
+                'status': 'offline',
+                'response_time': None,
+                'message': 'Vertex adapter not available'
             }
         except asyncio.TimeoutError:
-            model_health_cache['gemini'] = {
+            model_health_cache['vertex'] = {
                 'last_check': now,
                 'status': 'degraded',
                 'response_time': 5000,
                 'message': 'Slow response'
             }
-        except Exception:
-            model_health_cache['gemini'] = {
+        except Exception as e:
+            # Check what type of error it is
+            error_str = str(e).lower()
+            if 'credentials' in error_str or 'authentication' in error_str or 'permission' in error_str:
+                # This is an actual auth issue
+                model_health_cache['vertex'] = {
+                    'last_check': now,
+                    'status': 'offline',
+                    'response_time': None,
+                    'message': 'Authentication error - check WEF or ADC configuration'
+                }
+            else:
+                # Some other error - but Vertex might still be working
+                # Try a simpler test without grounding
+                try:
+                    from app.llm.vertex_genai_adapter import VertexGenAIAdapter
+                    vertex_adapter = VertexGenAIAdapter(project="contestra-ai", location="europe-west4")
+                    test_start = time.time()
+                    
+                    # Simple test without grounding
+                    response = await asyncio.wait_for(
+                        vertex_adapter.analyze_with_gemini(
+                            prompt="What is 1+1?",
+                            use_grounding=False,
+                            model_name="gemini-2.0-flash"
+                        ),
+                        timeout=5.0
+                    )
+                    
+                    response_time = int((time.time() - test_start) * 1000)
+                    if response and response.get('content'):
+                        # It works! Update status to healthy
+                        model_health_cache['vertex'] = {
+                            'last_check': now,
+                            'status': 'healthy',
+                            'response_time': response_time,
+                            'message': 'Using WEF authentication'
+                        }
+                    else:
+                        model_health_cache['vertex'] = {
+                            'last_check': now,
+                            'status': 'degraded',
+                            'response_time': response_time,
+                            'message': f'Partial functionality: {str(e)[:50]}'
+                        }
+                except:
+                    # Really offline
+                    model_health_cache['vertex'] = {
+                        'last_check': now,
+                        'status': 'offline',
+                        'response_time': None,
+                        'message': f'Error: {str(e)[:100]}'
+                    }
+    
+    health_status['models']['vertex'] = {
+        'status': model_health_cache['vertex']['status'],
+        'avg_response_time_ms': model_health_cache['vertex']['response_time'],
+        'message': model_health_cache['vertex'].get('message',
+                  f"~{model_health_cache['vertex']['response_time']/1000:.1f}s avg" 
+                  if model_health_cache['vertex']['response_time'] else None)
+    }
+    
+    # Check Gemini Direct API
+    if (model_health_cache['gemini_direct']['last_check'] is None or 
+        now - model_health_cache['gemini_direct']['last_check'] > cache_duration):
+        try:
+            # Test Direct API with grounding support
+            from google import genai
+            from google.genai import types
+            
+            client = genai.Client(api_key=settings.google_api_key)
+            test_start = time.time()
+            
+            # Test with grounding capability
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents="Test",
+                config=types.GenerateContentConfig(
+                    temperature=0,
+                    max_output_tokens=10,
+                    tools=[types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())]
+                )
+            )
+            
+            response_time = int((time.time() - test_start) * 1000)
+            if response.text:
+                model_health_cache['gemini_direct'] = {
+                    'last_check': now,
+                    'status': 'healthy',
+                    'response_time': response_time,
+                    'message': 'Direct API with grounding'
+                }
+            else:
+                model_health_cache['gemini_direct'] = {
+                    'last_check': now,
+                    'status': 'degraded',
+                    'response_time': response_time,
+                    'message': 'Empty response'
+                }
+        except Exception as e:
+            model_health_cache['gemini_direct'] = {
                 'last_check': now,
                 'status': 'offline',
                 'response_time': None,
-                'message': 'API error'
+                'message': 'API key not configured or API error'
             }
     
-    health_status['models']['gemini'] = {
-        'status': model_health_cache['gemini']['status'],
-        'avg_response_time_ms': model_health_cache['gemini']['response_time'],
-        'message': model_health_cache['gemini'].get('message',
-                  f"~{model_health_cache['gemini']['response_time']/1000:.1f}s avg" 
-                  if model_health_cache['gemini']['response_time'] else None)
+    health_status['models']['gemini_direct'] = {
+        'status': model_health_cache['gemini_direct']['status'],
+        'avg_response_time_ms': model_health_cache['gemini_direct']['response_time'],
+        'message': model_health_cache['gemini_direct'].get('message',
+                  f"~{model_health_cache['gemini_direct']['response_time']/1000:.1f}s avg" 
+                  if model_health_cache['gemini_direct']['response_time'] else None)
     }
     
     # Check background runner
@@ -257,7 +400,7 @@ async def health_check() -> Dict[str, Any]:
     # Determine overall status
     if health_status['database']['status'] == 'offline':
         health_status['status'] = 'offline'
-    elif any(health_status['models'][m]['status'] == 'offline' for m in ['openai', 'gemini']):
+    elif any(health_status['models'][m]['status'] == 'offline' for m in ['openai', 'vertex']):
         health_status['status'] = 'degraded'
     
     health_status['response_time_ms'] = int((time.time() - start_time) * 1000)

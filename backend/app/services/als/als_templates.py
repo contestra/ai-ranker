@@ -66,7 +66,7 @@ class ALSTemplates:
             country="Germany",
             timezone="Europe/Berlin",
             utc_offsets={"summer": "+02:00", "winter": "+01:00"},
-            civic_keyword="B\u00fcrgeramt",  # Bürgeramt
+            civic_keyword="Bundesportal",
             phrases=[
                 "Reisepass beantragen Termin",
                 "F\u00fchrerschein umtauschen",  # Führerschein
@@ -75,12 +75,12 @@ class ALSTemplates:
                 "Kindergeld Antrag",
                 "Aufenthaltstitel verl\u00e4ngern",  # verlängern
             ],
-            formatting_example="10115 Berlin \u00b7 +49 30 xxx xx xx \u00b7 12,90 \u20ac",  # · and €
-            weather_stub_local="Nationaler Wetterdienst: Berlin",
+            formatting_example="10115 Berlin \u2022 +49 30 xxx xx xx \u2022 12,90 \u20ac",  # • and €
+            weather_stub_local="MwSt. \u2014 allgemeine Ausk\u00fcnfte",  # Now regulatory cue instead of weather
             notes=[
                 "5-digit postal codes; comma decimals (12,90 \u20ac); +49 phone",
-                "Orthography: Stra\u00dfe (\u00df) vs CH Strasse",  # Straße (ß)
                 "Date: DD.MM.YYYY",
+                "Regulatory cue: MwSt. (VAT) instead of weather",
             ],
         ),
         # Switzerland - Using Unicode escapes
@@ -89,21 +89,21 @@ class ALSTemplates:
             country="Switzerland",
             timezone="Europe/Zurich",
             utc_offsets={"summer": "+02:00", "winter": "+01:00"},
-            civic_keyword="Bundesverwaltung",
+            civic_keyword="Gemeinde",
             phrases=[
-                "F\u00fchrerausweis verl\u00e4ngern / renouveler permis",  # Führerausweis verlängern
-                "AHV / AVS Nummer",
+                "F\u00fchrerausweis verl\u00e4ngern",  # Führerausweis verlängern
                 "e-Umzug melden",
                 "Steuererkl\u00e4rung einreichen",  # Steuererklärung
                 "ID verl\u00e4ngern",  # verlängern
                 "Einwohnerkontrolle",
+                "AHV-Nummer",
             ],
-            formatting_example="8001 Z\u00fcrich \u00b7 +41 44 xxx xx xx \u00b7 CHF 12.90",  # Zürich, ·
-            weather_stub_local="Nationaler Wetterdienst: Z\u00fcrich",  # Zürich
+            formatting_example="8001 Z\u00fcrich \u2022 +41 44 xxx xx xx \u2022 CHF 12.90",  # Zürich, •
+            weather_stub_local="MWST \u2014 allgemeine Ausk\u00fcnfte",  # Regulatory cue
             notes=[
                 "4-digit postal codes; CHF 12.90; +41 phone",
-                "Orthography: Strasse (ss) (no \u00df)",  # ß
-                "Multilingual: DE/FR/IT names vary",
+                "Date: DD.MM.YYYY",
+                "One language per run (DE/FR/IT)",
             ],
         ),
         # United States
@@ -115,15 +115,15 @@ class ALSTemplates:
             civic_keyword="state DMV",
             phrases=[
                 "driver license renewal appointment",
-                "passport application online",
-                "Social Security card replacement",
+                "passport application",
+                "Social Security card",
                 "voter registration",
-                "IRS tax return filing",
+                "IRS tax return",
                 "REAL ID appointment",
                 "vehicle registration",
             ],
-            formatting_example="New York, NY 10001 \u00b7 (212) xxx-xxxx \u00b7 $12.90",  # ·
-            weather_stub_local="National Weather Service: New York",
+            formatting_example="New York, NY 10001 \u2022 (212) xxx-xxxx \u2022 $12.90",  # •
+            weather_stub_local="state sales tax \u2014 general info",  # Regulatory cue
             notes=[
                 "5-digit ZIP; dollar with period decimals ($12.90); (xxx) xxx-xxxx phone",
                 "Date: MM/DD/YYYY",
@@ -138,18 +138,18 @@ class ALSTemplates:
             civic_keyword="GOV.UK",
             phrases=[
                 "driving licence renewal",
-                "passport application",
+                "passport renewal",
                 "National Insurance number",
-                "Council Tax payment",
+                "council tax payment",
                 "Universal Credit claim",
+                "NHS GP registration",
                 "MOT test booking",
-                "electoral register",
             ],
-            formatting_example="London SW1A 1AA \u00b7 020 xxxx xxxx \u00b7 \u00a312.90",  # · and £
-            weather_stub_local="Met Office forecast: London",
+            formatting_example="London SW1A 1AA \u2022 +44 20 xxxx xxxx \u2022 \u00a312.90",  # • and £
+            weather_stub_local="VAT \u2014 general info",  # Regulatory cue
             notes=[
-                "Alphanumeric postcodes; \u00a3 with period decimals; 020 phone",  # £
-                "Spelling: licence (not license)",
+                "Alphanumeric postcodes; \u00a3 with period decimals; +44 phone",  # £
+                "Spelling: licence (not license), localisation",
                 "Date: DD/MM/YYYY",
             ],
         ),
@@ -159,22 +159,23 @@ class ALSTemplates:
             country="United Arab Emirates",
             timezone="Asia/Dubai",
             utc_offsets={"year_round": "+04:00"},
-            civic_keyword="\u0633\u064a\u0627\u0642 \u0645\u062d\u0644\u064a",  # سياق محلي (Arabic: local context)
+            civic_keyword="\u0627\u0644\u0647\u0648\u064a\u0629 \u0648\u0627\u0644\u062c\u0646\u0633\u064a\u0629 (ICP)",  # الهوية والجنسية
             phrases=[
-                "Emirates ID renewal",
-                "driving license renewal",
-                "visa status check",
-                "MOHAP medical license",
-                "trade license renewal",
-                "Ejari registration",
-                "Tawtheeq attestation",
+                "\u062a\u062c\u062f\u064a\u062f \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0647\u0648\u064a\u0629 \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a\u064a\u0629",  # تجديد بطاقة الهوية الإماراتية
+                "\u062d\u0627\u0644\u0629 \u062a\u0623\u0634\u064a\u0631\u0629 \u0627\u0644\u0625\u0642\u0627\u0645\u0629",  # حالة تأشيرة الإقامة
+                "\u0633\u062f\u0627\u062f \u0627\u0644\u0645\u062e\u0627\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u0631\u0648\u0631\u064a\u0629",  # سداد المخالفات المرورية
+                "\u062a\u0633\u062c\u064a\u0644 \u0639\u0642\u062f \u0627\u0644\u0625\u064a\u062c\u0627\u0631",  # تسجيل عقد الإيجار
+                "\u062a\u062c\u062f\u064a\u062f \u0627\u0644\u0631\u062e\u0635\u0629 \u0627\u0644\u062a\u062c\u0627\u0631\u064a\u0629",  # تجديد الرخصة التجارية
+                "\u0641\u062d\u0635 \u0627\u0644\u0644\u064a\u0627\u0642\u0629 \u0627\u0644\u0637\u0628\u064a\u0629",  # فحص اللياقة الطبية
+                "\u062a\u062c\u062f\u064a\u062f \u0631\u062e\u0635\u0629 \u0627\u0644\u0642\u064a\u0627\u062f\u0629",  # تجديد رخصة القيادة
             ],
-            formatting_example="Dubai \u00b7 +971 4 xxx xxxx \u00b7 AED 49.00",  # ·
-            weather_stub_local="National Center of Meteorology: Dubai",
+            formatting_example="\u062f\u0628\u064a \u0635.\u0628. \u2022 +971 4 xxx xxxx \u2022 49.00 \u062f.\u0625",  # دبي ص.ب. • د.إ
+            weather_stub_local="\u0636\u0631\u064a\u0628\u0629 \u0627\u0644\u0642\u064a\u0645\u0629 \u0627\u0644\u0645\u0636\u0627\u0641\u0629 \u2014 \u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0639\u0627\u0645\u0629",  # ضريبة القيمة المضافة — معلومات عامة
             notes=[
                 "No postal codes; AED currency; +971 phone",
                 "Working week: Sunday-Thursday",
                 "Date: DD/MM/YYYY",
+                "Arabic civic phrases with English header",
             ],
         ),
         # Singapore
@@ -183,21 +184,21 @@ class ALSTemplates:
             country="Singapore",
             timezone="Asia/Singapore",
             utc_offsets={"year_round": "+08:00"},
-            civic_keyword="SingPass",
+            civic_keyword="ICA",
             phrases=[
-                "NRIC renewal appointment",
-                "passport renewal eSC",
-                "CPF statement request",
-                "HDB resale application",
-                "BTO application",
+                "passport appointment online",
+                "Singpass login",
+                "CPF statement",
+                "HDB BTO application",
+                "FIN card renewal",
+                "MOM work pass status",
                 "road tax renewal",
-                "work permit application",
             ],
-            formatting_example="Singapore 238823 \u00b7 +65 xxxx xxxx \u00b7 S$12.90",  # ·
-            weather_stub_local="Meteorological Service: Singapore",
+            formatting_example="Singapore 049315 \u2022 +65 6xxx xxxx \u2022 S$12.90",  # •
+            weather_stub_local="GST \u2014 general info",  # Regulatory cue
             notes=[
                 "6-digit postal codes; S$ currency; +65 phone",
-                "Date: DD/MM/YYYY",
+                "Date: DD MMM YYYY or DD/MM/YYYY",
             ],
         ),
         # Italy
@@ -206,18 +207,18 @@ class ALSTemplates:
             country="Italy",
             timezone="Europe/Rome",
             utc_offsets={"summer": "+02:00", "winter": "+01:00"},
-            civic_keyword="Servizi Pubblici",
+            civic_keyword="Comune",
             phrases=[
                 "carta d'identit\u00e0 rinnovo",  # identità
-                "patente di guida rinnovo",
+                "patente rinnovo",
                 "codice fiscale richiesta",
                 "SPID attivazione",
-                "permesso di soggiorno",
+                "ISEE compilazione",
                 "certificato di residenza",
-                "ISEE dichiarazione",
+                "carta d'identit\u00e0 elettronica",
             ],
-            formatting_example="00100 Roma \u00b7 +39 06 xxxx xxxx \u00b7 12,90 \u20ac",  # · and €
-            weather_stub_local="servizio meteo nazionale: Roma",
+            formatting_example="00100 Roma \u2022 +39 06 xxxx xxxx \u2022 12,90 \u20ac",  # • and €
+            weather_stub_local="IVA \u2014 informazioni generali",  # Regulatory cue
             notes=[
                 "5-digit CAP codes; \u20ac with comma decimals; +39 phone",  # €
                 "Date: DD/MM/YYYY",
@@ -229,18 +230,18 @@ class ALSTemplates:
             country="France",
             timezone="Europe/Paris",
             utc_offsets={"summer": "+02:00", "winter": "+01:00"},
-            civic_keyword="Service Public",
+            civic_keyword="Portail national",
             phrases=[
                 "Carte d'identit\u00e9 renouvellement",  # identité
-                "passeport demande en ligne",
+                "passeport demande",
                 "permis de conduire",
                 "Carte Vitale demande",
                 "FranceConnect connexion",
                 "imp\u00f4ts d\u00e9claration",  # impôts déclaration
                 "acte de naissance",
             ],
-            formatting_example="75001 Paris \u00b7 +33 1 xx xx xx xx \u00b7 12,90 \u20ac",  # · and €
-            weather_stub_local="service m\u00e9t\u00e9o national : Paris",  # météo
+            formatting_example="75001 Paris \u2022 +33 1 xx xx xx xx \u2022 12,90 \u20ac",  # • and €
+            weather_stub_local="TVA \u2014 informations g\u00e9n\u00e9rales",  # TVA — informations générales
             notes=[
                 "5-digit postal; \u20ac with comma decimals; +33 phone",  # €
                 "Date: DD/MM/YYYY",
@@ -314,14 +315,26 @@ class ALSTemplates:
             tz = ZoneInfo("UTC")
 
         now = now or datetime.now(tz)
-        stamp = now.strftime("%Y-%m-%d %H:%M")
+        # Format date based on country conventions
+        date_formats = {
+            "US": "%m/%d/%Y",  # MM/DD/YYYY
+            "GB": "%d/%m/%Y",  # DD/MM/YYYY
+            "DE": "%d.%m.%Y",  # DD.MM.YYYY
+            "CH": "%d.%m.%Y",  # DD.MM.YYYY
+            "FR": "%d/%m/%Y",  # DD/MM/YYYY
+            "IT": "%d/%m/%Y",  # DD/MM/YYYY
+            "AE": "%d/%m/%Y",  # DD/MM/YYYY
+            "SG": "%d %b %Y",  # DD MMM YYYY
+        }
+        date_format = date_formats.get(code, "%Y-%m-%d")
+        stamp = now.strftime(f"{date_format} %H:%M")
         offset_seconds = tz.utcoffset(now)
-        # offset like +HH:MM
+        # offset like UTC+HH:MM or UTC-HH:MM
         total_minutes = int(offset_seconds.total_seconds() // 60) if offset_seconds else 0
         sign = "+" if total_minutes >= 0 else "-"
         hh = abs(total_minutes) // 60
         mm = abs(total_minutes) % 60
-        offset_str = f"{sign}{hh:02d}:{mm:02d}"
+        offset_str = f"UTC{sign}{hh:02d}:{mm:02d}"
 
         # Phrase selection
         if not tpl.phrases:
@@ -329,16 +342,10 @@ class ALSTemplates:
         idx = (phrase_idx % len(tpl.phrases)) if isinstance(phrase_idx, int) else 0
         phrase = tpl.phrases[idx]
 
-        # Header language with Unicode escapes
+        # Use English headers for consistent English output
+        # GB uses 'localisation' (British spelling), others use 'localization' (American spelling)
         header = {
-            "DE": "Lokaler Kontext (nur zur Lokalisierung; nicht zitieren):",
-            "CH": "Lokaler Kontext (nur zur Lokalisierung; nicht zitieren):",
-            "IT": "Contesto locale (solo per la localizzazione; non citare):",
-            "FR": "Contexte local (uniquement pour la localisation ; ne pas citer) :",
             "GB": "Ambient Context (localisation only; do not cite):",
-            "US": "Ambient Context (localization only; do not cite):",
-            "AE": "\u0633\u064a\u0627\u0642 \u0645\u062d\u0644\u064a (\u0644\u0623\u063a\u0631\u0627\u0636 \u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0645\u0648\u0642\u0639 \u0641\u0642\u0637\u061b \u0644\u0627 \u062a\u064f\u0630\u0643\u0631):",  # Arabic
-            "SG": "Ambient Context (localization only; do not cite):",
         }.get(code, "Ambient Context (localization only; do not cite):")
 
         if header_language:
@@ -347,29 +354,24 @@ class ALSTemplates:
         # Use em-dash for better Unicode compatibility
         emdash = "\u2014"  # —
         
+        # Build the block with regulatory cue instead of weather
+        # weather_stub_local now contains the regulatory cue (e.g., "VAT — general info")
         lines = [
             f"{header}",
             f"- {stamp}, {offset_str}",
             f"- {tpl.civic_keyword} {emdash} \"{phrase}\"",
             f"- {tpl.formatting_example}",
+            f"- {tpl.weather_stub_local}",  # This is now the regulatory cue
         ]
-        if include_weather and tpl.weather_stub_local:
-            lines.append(f"- {tpl.weather_stub_local}")
 
         block = "\n".join(lines)
 
         if len(block) > MAX_CHARS:
-            # Try without weather
-            if include_weather and tpl.weather_stub_local:
-                return cls.render_block(
-                    code=code,
-                    now=now,
-                    tz_override=tz_override,
-                    phrase_idx=phrase_idx,
-                    include_weather=False,
-                    header_language=header_language,
-                )
-            raise ValueError(f"ALS block for {code} exceeds {MAX_CHARS} chars even without weather")
+            # Try without regulatory cue (last line)
+            lines_without_reg = lines[:-1]
+            block = "\n".join(lines_without_reg)
+            if len(block) > MAX_CHARS:
+                raise ValueError(f"ALS block for {code} exceeds {MAX_CHARS} chars even without regulatory cue")
 
         return block
 

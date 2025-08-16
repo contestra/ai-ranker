@@ -89,3 +89,11 @@ nul
 
 # Robots.txt analysis files
 /robots/
+
+# GCP Credentials - NEVER commit these
+config/gcp-workload-identity.json
+**/application_default_credentials.json
+**/adc.json
+**/*-service-account.json
+**/vertex-runner*.json
+**/*-sa-key.json

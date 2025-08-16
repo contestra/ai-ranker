@@ -1,0 +1,24 @@
+
+<!DOCTYPE html>
+<html>
+<head><title>Test Runs Display</title></head>
+<body>
+<h1>Runs for brand avea</h1>
+<div id='runs'></div>
+<script>
+fetch('http://localhost:8000/api/prompt-tracking/runs?brand_name=avea&limit=20')
+  .then(r => r.json())
+  .then(data => {
+    const container = document.getElementById('runs');
+    const recent = data.runs.filter(r => r.id >= 225 && r.id <= 232);
+    recent.forEach(run => {
+      const div = document.createElement('div');
+      div.innerHTML = 'Run ' + run.id + ': Template ' + run.template_id + 
+                      ', Model: <b>' + run.model_name + '</b>, ' +
+                      'Country: ' + run.country_code + ', Mode: ' + run.grounding_mode;
+      container.appendChild(div);
+    });
+  });
+</script>
+</body>
+</html>

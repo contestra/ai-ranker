@@ -1,6 +1,59 @@
 # CLAUDE.md - AI Rank & Influence Tracker
 
-## Latest Update (August 15, 2025) - Production-Grade LLM Architecture ✅
+## 🚨 WINDOWS USERS: ALWAYS SET UTF-8 ENCODING FIRST! 🚨
+
+### BEFORE DOING ANYTHING ELSE ON WINDOWS:
+```bash
+set PYTHONUTF8=1
+```
+
+**This prevents 90% of "Unicode/encoding" errors!** Without this, you'll see:
+- `'charmap' codec can't encode character '\u2713'` (checkmarks)
+- `'charmap' codec can't encode character '\u0130'` (Turkish İ)
+- `'charmap' codec can't encode character '\u20ac'` (Euro €)
+
+**Common triggers:**
+- Using ✓ or ✗ symbols in print statements
+- AI responses with international brands
+- Currency symbols (€, £, ¥)
+- Any non-ASCII characters
+
+**The fix is ALWAYS the same:** Set `PYTHONUTF8=1` before running Python!
+
+---
+
+## Latest Update (August 16, 2025) - Finish Reason Tracking & Vertex Fallback ✅
+
+### 🎯 Major Enhancement: Response Metadata Tracking
+**Problem Solved**: Users couldn't understand why prompts failed (token exhaustion, content filtering, etc.)
+
+**What Was Implemented**:
+- Added `finish_reason` and `content_filtered` tracking to database and API
+- Frontend displays clear visual indicators for response issues
+- Yellow warning boxes explain token exhaustion, content filtering, or normal completion
+- Warning icons in run list for quick identification of problematic runs
+
+**Technical Details**:
+- Database: Added `finish_reason` (TEXT) and `content_filtered` (BOOLEAN) columns to `prompt_results`
+- Backend: Captures metadata from model responses (GPT-5 and Gemini)
+- Frontend: Visual indicators with helpful messages about token starvation (GPT-5 needs 4000+ tokens)
+- API: Returns metadata in `/api/prompt-tracking/results/{run_id}` endpoint
+
+### 🔧 Fixed: Vertex AI Local Development Fallback
+**Problem**: Vertex AI requires Application Default Credentials (ADC) which aren't available locally
+**Solution**: Automatic fallback to direct Gemini API when Vertex auth fails
+
+**How It Works**:
+1. Production (Fly.io): Uses Vertex AI with WEF authentication ✅
+2. Local Development: Detects auth failure → Falls back to direct Gemini API ✅
+3. Transparent to users: Same results whether using Vertex or direct API
+
+**Files Modified**:
+- `backend/app/llm/langchain_adapter.py` - Added fallback logic
+- `backend/app/llm/adapters/vertex_genai_adapter.py` - Re-raises auth errors for fallback
+- `backend/app/llm/gemini_direct_adapter.py` - Fixed token_count null handling
+
+## Previous Update (August 15, 2025) - Production-Grade LLM Architecture ✅
 
 ### 🚀 Complete Rewrite Following ChatGPT's Production Standards - IMPLEMENTED
 
@@ -36,8 +89,8 @@ backend/app/llm/
 ### ✅ Working Solution Implemented
 
 **Configuration That Works**:
-- **Region**: `europe-west4` (NOT us-central1)
-- **Model**: `gemini-2.0-flash` (available and working)
+- **Region**: `europe-west4` (fully operational)
+- **Models**: `gemini-2.5-pro`, `gemini-2.5-flash` (both working perfectly)
 - **Project**: `contestra-ai`
 - **Authentication**: Application Default Credentials (ADC)
 
@@ -51,7 +104,7 @@ class VertexGenAIAdapter:
         self.client = genai.Client(
             vertexai=True,
             project=project,
-            location=location  # CRITICAL: Must be europe-west4
+            location=location  # Uses europe-west4 directly
         )
     
     async def analyze_with_gemini(self, prompt, use_grounding=False, context=None):
@@ -65,13 +118,10 @@ class VertexGenAIAdapter:
             # Vertex uses GoogleSearch(), not google_search_retrieval
             config.tools = [types.Tool(google_search=types.GoogleSearch())]
         
-        # Maps model names to available models in europe-west4
-        if "gemini-1.5" in model_name or "gemini-2.5" in model_name:
-            actual_model = "gemini-2.0-flash"  # Available in EU
-        
-        # Server-side execution - no manual tool loops!
+        # Use Gemini 2.5 models directly - they work in europe-west4
+        # gemini-2.5-pro and gemini-2.5-flash are both available
         response = self.client.models.generate_content(
-            model=actual_model,
+            model=model_name,  # gemini-2.5-pro or gemini-2.5-flash
             contents=messages,
             config=config
         )
@@ -90,18 +140,102 @@ class VertexGenAIAdapter:
 
 **KEY ACHIEVEMENT**: AVEA brand successfully detected with grounding enabled in Switzerland!
 
-### 🔍 What Was Actually Wrong (Not IAM!)
+### 🔍 Current Implementation Status
 
-#### The Real Issues:
-1. **Regional Model Availability**: Models listed in `models.list()` aren't always accessible
-2. **Wrong Region**: us-central1 has models listed but returns 404 on generate_content
-3. **Solution**: europe-west4 with gemini-2.0-flash works perfectly
+#### Working Configuration:
+1. **europe-west4 region**: Full access to Gemini 2.5 models
+2. **Models available**: `gemini-2.5-pro` and `gemini-2.5-flash` (without version suffixes)
+3. **Grounding**: Working perfectly with GoogleSearch tool
+4. **Authentication**: ADC working correctly
 
 #### What We Learned:
-- **404 errors ≠ IAM propagation delays** (this was a misdiagnosis)
-- **europe-west4** has working models: gemini-2.0-flash, gemini-2.0-flash-lite
-- **us-central1** lists models but can't access them (quota/regional restrictions)
-- **Model names are flexible**: Accepts both with and without publisher prefix
+- **Gemini 2.5 models ARE available** in europe-west4 (use without -002 suffix)
+- **Don't use `global` location** - causes permission errors
+
+## ⚠️ CRITICAL: Windows Unicode/Encoding Issues
+
+### The Problem
+On Windows, Python defaults to the system's code page (often cp1252) which cannot handle Unicode characters like Turkish İ, ş, ğ, ç, ö, ü or special symbols. This causes frequent crashes with errors like:
+- `'charmap' codec can't encode character '\u0130'`
+- `'charmap' codec can't encode character '\u00fc'`
+
+### The Solution - ALWAYS DO THIS ON WINDOWS:
+
+#### 1. Set Environment Variable BEFORE Running Python:
+```bash
+# PowerShell
+$env:PYTHONUTF8=1
+python script.py
+
+# Command Prompt
+set PYTHONUTF8=1
+python script.py
+
+# Or permanently in Windows System Settings
+PYTHONUTF8=1
+```
+
+#### 2. For Backend Server:
+```bash
+# ALWAYS start the backend with UTF-8 encoding enabled
+set PYTHONUTF8=1
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+#### 3. In Code - When Writing Files:
+```python
+# ALWAYS specify encoding when opening files
+with open('file.txt', 'w', encoding='utf-8') as f:
+    f.write(content)
+
+# For JSON files
+with open('data.json', 'w', encoding='utf-8') as f:
+    json.dump(data, f, ensure_ascii=False)
+```
+
+#### 4. For Print Statements:
+```python
+# Either set PYTHONUTF8=1 or sanitize output
+def sanitize_for_windows(text):
+    """Remove problematic Unicode characters for Windows console"""
+    replacements = {
+        'İ': 'I', 'ı': 'i', 'ş': 's', 'ğ': 'g',
+        'ç': 'c', 'ö': 'o', 'ü': 'u', 'Ş': 'S',
+        'Ğ': 'G', 'Ç': 'C', 'Ö': 'O', 'Ü': 'U'
+    }
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+    return text
+
+# Use when debugging
+print(sanitize_for_windows(ai_response))
+```
+
+### Common Places This Occurs:
+1. **AI responses** containing international brands/companies (e.g., "Türk Telekom")
+2. **Ambient Location Signals** with Unicode characters (€, £, ü, ö, ä)
+3. **Debug print statements** in development
+4. **Log files** without encoding specified
+5. **JSON serialization** without ensure_ascii=False
+
+### Prevention Checklist:
+- ✅ **ALWAYS** set `PYTHONUTF8=1` before running ANY Python script
+- ✅ Start every Python session with `set PYTHONUTF8=1` on Windows
+- ✅ Avoid using Unicode symbols (✓, ✗, €, etc.) in print statements
+- ✅ Always use `encoding='utf-8'` when opening files
+- ✅ Remove debug print statements before production
+- ✅ Use logging with proper encoding configuration
+- ✅ Test with international characters during development
+
+### Quick Rule for Claude/AI Assistants:
+**On Windows, ALWAYS prefix Python commands with:**
+```bash
+set PYTHONUTF8=1 && python script.py
+```
+This prevents the "Unicode issue strikes again!" problem that happens 100+ times per day!
+- **Model names are specific**: Use exact names like `gemini-2.5-pro`, not `gemini-2.5-pro-002`
+- **Grounding works great**: Server-side execution with GoogleSearch tool
 
 ### 📊 Current Production Status
 
@@ -132,14 +266,16 @@ cd backend && python test_vertex_grounding.py
 cd backend && python test_vertex_eu.py
 ```
 
-### 🚨 Important Notes
+### 🚨 Important Architecture Notes
 
-1. **Don't Wait for IAM**: If you see 404 errors, it's NOT permissions - check region/model
-2. **Use europe-west4**: This region has working models
-3. **Model Mapping**: The adapter automatically maps requested models to available ones
-4. **Tool Types Matter**: Vertex uses `GoogleSearch()`, Direct API uses `GoogleSearchRetrieval()`
+1. **TWO Vertex Adapters Exist** (needs consolidation):
+   - `/app/llm/vertex_genai_adapter.py` - Used by Templates tab (working)
+   - `/app/llm/adapters/vertex_genai_adapter.py` - Used by Grounding Test tab (needs region fix)
+2. **Use europe-west4**: Never change to `global` - it causes permission errors
+3. **Gemini 2.5 models work perfectly**: Both Pro and Flash variants are fully operational
+4. **Grounding is server-side**: No manual tool loops needed
 
-**The system is now fully operational with Vertex AI providing server-side grounding!**
+**The system is fully operational - Gemini 2.5 models work great with grounding!**
 
 ## Previous Update (August 14, 2025) - Bundle-Aware Template Deduplication
 
@@ -658,16 +794,31 @@ Access at: http://localhost:3001
 - Production-ready modules provided: canonicalize.py, provider_probe.py
 - Comprehensive testing protocol included
 
-## Model Support Status (UPDATED Aug 15, 2025)
+## Model Support Status (UPDATED Aug 16, 2025)
 
-**OFFICIALLY SUPPORTED MODELS ONLY:**
-- ✅ **GPT-5, GPT-5-mini, GPT-5-nano**: Primary OpenAI models with web search via Responses API
-- ✅ **Gemini 2.5 Pro, Gemini 2.5 Flash**: Only Gemini versions with GoogleSearch grounding support
+**⚠️ CRITICAL: GPT-5 TOKEN REQUIREMENTS (FIXED)**
+GPT-5 models require **4000+ tokens** for complex reasoning queries. Without sufficient tokens, GPT-5's reasoning models consume all tokens internally and produce empty output.
 
-**DO NOT USE (Not Supported):**
-- ❌ GPT-4o, GPT-4o-mini - Use GPT-5 models instead
+**RECOMMENDED MODELS:**
+- ✅ **Gemini 2.5 Pro, Gemini 2.5 Flash**: Full support, no token issues
+- ✅ **GPT-5 models**: Work perfectly with 4000 tokens allocated (now fixed in code)
+- ✅ **GPT-4o**: Works as fallback
+
+**DO NOT USE:**
 - ❌ Gemini 1.5 Pro/Flash - No grounding support
 - ❌ Gemini 2.0 Flash - Limited grounding, use 2.5 instead
+
+**GPT-5 Test Results (Aug 16, 2025 - FINAL):**
+- With 2000 tokens: Many complex queries return empty
+- With 4000-6000 tokens: ALL queries work perfectly!
+
+**Examples with proper token allocation:**
+- ✅ "List the top 10 longevity supplement brands" → Works
+- ✅ "What are the most trusted longevity supplement brands?" → **Works with 4000+ tokens!**
+- ✅ "What are the most trusted ecommerce companies?" → **Works with 4000+ tokens!**
+- ✅ "What are the most trusted tech companies?" → **Works with 4000+ tokens!**
+
+**Key Finding**: There is NO content filtering! GPT-5 just needs more tokens for complex reasoning. Queries asking for "most trusted" evaluations require 3000-4000 tokens because the model performs extensive internal reasoning before generating output.
 
 **ALS Locale Inference Verified:**
 - ✅ Both GPT-5 and Gemini correctly adopt locale context
@@ -687,7 +838,7 @@ Access at: http://localhost:3001
 1. **GPT-5 Response Times**: Takes 25-30 seconds per request (normal behavior)
 2. **Non-deterministic Results**: Models give slightly different answers each time
 3. **Brand Recognition**: Many smaller brands classified as UNKNOWN or WEAK
-4. ~~**GPT-5 Empty Responses**~~ → **RESOLVED as of Aug 13, 2025**
+4. **Architecture Duplication**: Two vertex adapters exist (needs consolidation)
 
 ## Testing Commands
 
