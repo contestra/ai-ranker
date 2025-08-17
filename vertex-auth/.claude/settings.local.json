@@ -17,7 +17,9 @@
       "Bash(cp:*)",
       "Bash(set PYTHONUTF8=1)",
       "Bash(dir:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(gcloud auth:*)",
+      "Bash(set GOOGLE_APPLICATION_CREDENTIALS=%APPDATA%gcloudapplication_default_credentials.json)"
     ],
     "additionalDirectories": [
       "D:\\d\\OneDrive\\CONTESTRA\\Microapps\\ai-ranker",

@@ -549,6 +549,15 @@ async def run_prompt(request: PromptRunRequest):
                     # Extract response content and metadata
                     response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
                     
+                    # Debug logging - ALWAYS log for Gemini to diagnose issue
+                    if request.model_name in ["gemini", "gemini-flash"] or not response or response.startswith("[ERROR]"):
+                        print(f"[DEBUG] Response for {request.model_name}: {response[:100] if response else 'EMPTY'}")
+                        if isinstance(response_data, dict):
+                            print(f"[DEBUG] Response data keys: {response_data.keys()}")
+                            print(f"[DEBUG] Content field: {response_data.get('content', 'MISSING')[:100] if response_data.get('content') else 'EMPTY/MISSING'}")
+                            print(f"[DEBUG] Error field: {response_data.get('error', 'none')}")
+                            print(f"[DEBUG] API used: {response_data.get('api_used', 'unknown')}")
+                    
                     # Extract grounding metadata
                     tool_call_count = response_data.get("tool_call_count", 0) if isinstance(response_data, dict) else 0
                     grounded_effective = response_data.get("grounded_effective", False) if isinstance(response_data, dict) else False

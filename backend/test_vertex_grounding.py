@@ -31,7 +31,7 @@ except Exception as e:
     
 print("\nNow testing through our adapter...")
 import asyncio
-from app.llm.vertex_genai_adapter import VertexGenAIAdapter
+from app.llm.adapters.vertex_genai_adapter import VertexGenAIAdapter
 
 async def test_adapter():
     adapter = VertexGenAIAdapter(project="contestra-ai", location="europe-west4")

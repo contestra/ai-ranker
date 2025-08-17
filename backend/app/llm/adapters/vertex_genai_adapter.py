@@ -94,13 +94,18 @@ class VertexGenAIAdapter:
                     supports = getattr(gm, 'grounding_supports', []) or []
                     entry_point = getattr(gm, 'search_entry_point', None)
                     
-                    # Extract URIs from chunks as citations
+                    # Extract URIs from chunks as citations (as dicts for RunResult compatibility)
                     citations = []
                     for chunk in chunks:
                         if hasattr(chunk, 'web') and chunk.web:
                             uri = getattr(chunk.web, 'uri', None)
+                            title = getattr(chunk.web, 'title', None) if hasattr(chunk.web, 'title') else None
                             if uri:
-                                citations.append(uri)
+                                citations.append({
+                                    "uri": uri,
+                                    "title": title or "No title",
+                                    "source": "web_search"
+                                })
                     
                     # Grounding is effective if ANY of these are present
                     grounded = bool(queries or chunks or supports or entry_point)

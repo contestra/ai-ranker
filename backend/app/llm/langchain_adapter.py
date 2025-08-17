@@ -245,7 +245,7 @@ class LangChainAdapter:
             top_p: Top-p for nucleus sampling
         """
         # Try Vertex AI first (works in production with WEF)
-        from app.llm.vertex_genai_adapter import VertexGenAIAdapter
+        from app.llm.adapters.vertex_genai_adapter import VertexGenAIAdapter
         
         try:
             vertex_adapter = VertexGenAIAdapter(
@@ -263,6 +263,7 @@ class LangChainAdapter:
                 top_p=top_p
             )
             
+            print(f"[DEBUG] Vertex succeeded, returning result")
             return result
             
         except Exception as e:

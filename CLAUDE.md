@@ -22,7 +22,44 @@ set PYTHONUTF8=1
 
 ---
 
-## Latest Update (August 16, 2025) - Finish Reason Tracking & Vertex Fallback ✅
+## Latest Update (August 17, 2025) - Vertex AI ADC Setup & Import Refactoring ✅
+
+### 🎯 Major Fix: Vertex AI Now Working Locally with ADC
+**Problem Solved**: Vertex AI was falling back to direct API due to missing Application Default Credentials
+
+**Solution Implemented**:
+1. **Set up ADC locally**: Run `gcloud auth application-default login` and authenticate
+2. **Fixed citations bug**: Citations from Vertex were strings, now properly formatted as dicts
+3. **Backend restart with ADC**: Export `GOOGLE_APPLICATION_CREDENTIALS` to point to ADC file
+
+**Result**: Vertex AI now works locally with proper grounding support! 🎉
+
+### 🔧 Import Path Standardization
+**Problem**: Duplicate adapter files causing confusion (`app/llm/vertex_genai_adapter.py` vs `app/llm/adapters/vertex_genai_adapter.py`)
+
+**Solution Implemented**:
+1. **Standardized imports**: All files now use `from app.llm.adapters.vertex_genai_adapter import VertexGenAIAdapter`
+2. **Deprecation warning**: Old path shows warning to encourage migration
+3. **Backward compatibility**: Shim file ensures old imports still work
+4. **Sanity test**: Created test to verify both paths return same class
+
+**Files Updated**:
+- `langchain_adapter.py`, `health.py`, `test_vertex_grounding.py` - Updated imports
+- `app/llm/vertex_genai_adapter.py` - Now a deprecation shim with warning
+- `app/llm/adapters/vertex_genai_adapter.py` - The real implementation (source of truth)
+
+### 🐛 Citations Fix in Vertex Adapter
+**Problem**: Vertex was returning citations as strings, but RunResult model expects dicts
+**Solution**: Modified `_vertex_grounding_signals()` to format citations as:
+```python
+{
+    "uri": "https://...",
+    "title": "Page Title",
+    "source": "web_search"
+}
+```
+
+## Previous Update (August 16, 2025) - Finish Reason Tracking & Vertex Fallback ✅
 
 ### 🎯 Major Enhancement: Response Metadata Tracking
 **Problem Solved**: Users couldn't understand why prompts failed (token exhaustion, content filtering, etc.)
@@ -38,20 +75,6 @@ set PYTHONUTF8=1
 - Backend: Captures metadata from model responses (GPT-5 and Gemini)
 - Frontend: Visual indicators with helpful messages about token starvation (GPT-5 needs 4000+ tokens)
 - API: Returns metadata in `/api/prompt-tracking/results/{run_id}` endpoint
-
-### 🔧 Fixed: Vertex AI Local Development Fallback
-**Problem**: Vertex AI requires Application Default Credentials (ADC) which aren't available locally
-**Solution**: Automatic fallback to direct Gemini API when Vertex auth fails
-
-**How It Works**:
-1. Production (Fly.io): Uses Vertex AI with WEF authentication ✅
-2. Local Development: Detects auth failure → Falls back to direct Gemini API ✅
-3. Transparent to users: Same results whether using Vertex or direct API
-
-**Files Modified**:
-- `backend/app/llm/langchain_adapter.py` - Added fallback logic
-- `backend/app/llm/adapters/vertex_genai_adapter.py` - Re-raises auth errors for fallback
-- `backend/app/llm/gemini_direct_adapter.py` - Fixed token_count null handling
 
 ## Previous Update (August 15, 2025) - Production-Grade LLM Architecture ✅
 

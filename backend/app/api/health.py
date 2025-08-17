@@ -162,7 +162,7 @@ async def health_check() -> Dict[str, Any]:
             os.environ.pop('GOOGLE_APPLICATION_CREDENTIALS', None)
             
             # Try to import and use Vertex adapter
-            from app.llm.vertex_genai_adapter import VertexGenAIAdapter
+            from app.llm.adapters.vertex_genai_adapter import VertexGenAIAdapter
             vertex_adapter = VertexGenAIAdapter(project="contestra-ai", location="europe-west4")
             test_start = time.time()
             
@@ -220,7 +220,7 @@ async def health_check() -> Dict[str, Any]:
                 # Some other error - but Vertex might still be working
                 # Try a simpler test without grounding
                 try:
-                    from app.llm.vertex_genai_adapter import VertexGenAIAdapter
+                    from app.llm.adapters.vertex_genai_adapter import VertexGenAIAdapter
                     vertex_adapter = VertexGenAIAdapter(project="contestra-ai", location="europe-west4")
                     test_start = time.time()
                     
