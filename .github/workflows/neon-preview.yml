@@ -1,0 +1,109 @@
+name: Neon Preview Database
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+env:
+  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+  NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+
+jobs:
+  setup-preview:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      database_url: ${{ steps.create-branch.outputs.database_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Neon CLI
+        run: npm install -g neonctl
+
+      - name: Create Neon preview branch
+        id: create-branch
+        run: |
+          BRANCH_NAME="preview/${{ github.event.pull_request.number }}-${GITHUB_SHA:0:7}"
+          
+          # Create branch from dev
+          neonctl branches create \
+            --project-id $NEON_PROJECT_ID \
+            --name "$BRANCH_NAME" \
+            --parent dev \
+            --compute \
+            --type child
+          
+          # Get connection string
+          DATABASE_URL=$(neonctl connection-string \
+            --project-id $NEON_PROJECT_ID \
+            --branch "$BRANCH_NAME" \
+            --role-name neondb_owner \
+            --database-name neondb \
+            --ssl-mode require)
+          
+          echo "database_url=$DATABASE_URL" >> $GITHUB_OUTPUT
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ steps.create-branch.outputs.database_url }}
+        run: |
+          alembic upgrade head
+
+  run-tests:
+    needs: setup-preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ needs.setup-preview.outputs.database_url }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          pytest tests/ -v
+
+  cleanup-preview:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Neon CLI
+        run: npm install -g neonctl
+
+      - name: Delete Neon preview branch
+        run: |
+          BRANCH_NAME="preview/${{ github.event.pull_request.number }}-${GITHUB_SHA:0:7}"
+          
+          neonctl branches delete \
+            --project-id $NEON_PROJECT_ID \
+            --branch "$BRANCH_NAME" \
+            --force

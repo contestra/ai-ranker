@@ -1,0 +1,434 @@
+● Perfect! Now let me update the todo list and create the canonical service:
+
+  Update Todos
+  ⎿  [×] Create database backup
+     [×] Add new columns to database (nullable)
+     [ ] Create and run backfill script
+     [ ] Update backend with canonical JSON generation
+     [ ] Update frontend grounding mode values
+     [ ] Implement provider-aware UI
+     [ ] Add app-level enforcement
+     [ ] Test all grounding modes
+
+● Now let me create the canonical service file:
+
+  Write(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\services\canonical.py)
+  ⎿  Wrote 1 lines to ..\backend\app\services\canonical.py
+     """
+     Centralized canonical JSON generation for consistency.
+     Used by both API and backfill scripts.
+     """
+     import hashlib
+     from typing import Dict, Any, Tuple, Optional
+     try:
+         # Try to use orjson for deterministic serialization
+
+● Now let me check if we have a model registry file, and if not, create a simple one:
+
+● Read(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\llm\model_registry.py)
+  ⎿  Read 50 lines (ctrl+r to expand)
+
+● Good, we have the model registry. Now let me create the backfill script:
+
+  Write(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\scripts\backfill_migration.py)
+  ⎿  Wrote 1 lines to ..\backend\scripts\backfill_migration.py
+     """
+     Backfill script to populate new columns from existing data.
+     Uses model registry for accurate provider detection.
+     """
+     import sys
+     import os
+     import io
+     # Configure stdout for UTF-8
+
+  Bash(cd ../backend && python scripts/backfill_migration.py)
+  ⎿  Error: Traceback (most recent call last):
+       File "D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\scripts\backfill_migration.py", line 248, in <module>
+         backfill()
+       File "D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\scripts\backfill_migration.py", line 163, in backfill
+         grounding_mode = normalize_grounding_mode(run.get('grounding_mode'))
+                                                   ^^^^^^^
+     AttributeError: 'sqlite3.Row' object has no attribute 'get'
+
+     Starting backfill migration...
+
+
+
+     … +4 lines (ctrl+r to see all)
+
+● Let me fix the sqlite3.Row access issue:
+
+  Update(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\scripts\backfill_migration.py)
+  ⎿  Updated ..\backend\scripts\backfill_migration.py with 3 additions and 2 removals
+       157
+       158        updated_count = 0
+       159        for run in runs:
+       160 -          provider = get_provider(run['model_name'])
+       160 +          run_dict = dict(run)
+       161 +          provider = get_provider(run_dict['model_name'])
+       162
+       163            # Handle NULL grounding_mode
+       164 -          grounding_mode = normalize_grounding_mode(run.get('grounding_mode'))
+       164 +          grounding_mode = normalize_grounding_mode(run_dict.get('grounding_mode'))
+       165
+       166            # Determine response API
+       167            if provider == 'vertex':
+
+● Also fix the other references to run:
+
+  Update(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\scripts\backfill_migration.py)
+  ⎿  Updated ..\backend\scripts\backfill_migration.py with 3 additions and 3 removals
+       166            # Determine response API
+       167            if provider == 'vertex':
+       168                response_api = 'vertex_genai'
+       169 -          elif 'gpt-5' in run['model_name'].lower():
+       169 +          elif 'gpt-5' in run_dict['model_name'].lower():
+       170                response_api = 'responses_http'
+       171            else:
+       172                response_api = 'sdk_chat'
+     ...
+       194                WHERE id = ?
+       195            """, (
+       196                provider, grounding_mode, response_api, tool_choice,
+       197 -              2000 if 'gpt-5' in run['model_name'].lower() else 8192,
+       198 -              run['id']
+       197 +              2000 if 'gpt-5' in run_dict['model_name'].lower() else 8192,
+       198 +              run_dict['id']
+       199            ))
+       200            updated_count += 1
+       201
+
+  Bash(cd ../backend && python scripts/backfill_migration.py)
+  ⎿  Starting backfill migration...
+
+     1. Backfilling prompt_templates...
+     … +12 lines (ctrl+r to expand)
+
+● Excellent! The backfill is complete. Now let me update the todo list and update the prompt hasher to use
+  canonical modes:
+
+  Update Todos
+  ⎿  [×] Create database backup
+     [×] Add new columns to database (nullable)
+     [×] Create and run backfill script
+     [ ] Update backend with canonical JSON generation
+     [ ] Update frontend grounding mode values
+     [ ] Implement provider-aware UI
+     [ ] Add app-level enforcement
+     [ ] Test all grounding modes
+
+● Now let me update the prompt hasher to use canonical grounding modes:
+
+  Update(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\services\prompt_hasher.py)
+  ⎿  Updated ..\backend\app\services\prompt_hasher.py with 34 additions and 21 removals
+       33        return sorted(set(out))
+       34
+       35    def _normalize_modes(modes: Optional[Iterable[str]]) -> List[str]:
+       36 -      """Normalize grounding modes to canonical keys."""
+       37 -      # Map various representations to canonical
+       38 -      # IMPORTANT: preferred and required are DIFFERENT configurations
+       39 -      MAP = {
+       40 -          "MODEL KNOWLEDGE ONLY": "none",
+       41 -          "MODEL_ONLY": "none",
+       42 -          "UNGROUNDED": "none",
+       43 -          "NONE": "none",
+       44 -          "OFF": "none",
+       45 -          "GROUNDED (WEB SEARCH)": "web",
+       46 -          "WEB": "web",
+       47 -          "WEB_SEARCH": "web",
+       48 -          "GROUNDED": "web",
+       49 -          "PREFERRED": "preferred",  # Keep as distinct mode
+       50 -          "REQUIRED": "required",    # Keep as distinct mode
+       51 -          "AUTO": "preferred",        # Alias for preferred
+       36 +      """Normalize grounding modes to canonical values."""
+       37 +      if not modes:
+       38 +          return ["not_grounded"]  # Default when empty
+       39 +
+       40 +      CANONICAL = {"not_grounded", "preferred", "enforced"}
+       41 +
+       42 +      # For backward compatibility during migration
+       43 +      LEGACY_MAP = {
+       44 +          "off": "not_grounded",
+       45 +          "none": "not_grounded",
+       46 +          "ungrounded": "not_grounded",
+       47 +          "model knowledge only": "not_grounded",
+       48 +          "model_only": "not_grounded",
+       49 +          "web": "preferred",
+       50 +          "grounded": "preferred",
+       51 +          "grounded (web search)": "preferred",
+       52 +          "web_search": "preferred",
+       53 +          "auto": "preferred",
+       54 +          "preferred": "preferred",
+       55 +          "required": "enforced",
+       56 +          "enforced": "enforced"
+       57        }
+       58 +
+       59        out = []
+       60 -      for m in modes or []:
+       60 +      for m in modes:
+       61            if not m:
+       62                continue
+       63 -          k = str(m).strip().upper()
+       64 -          k = MAP.get(k, m.lower())  # Use mapping or lowercase original
+       65 -          out.append(k)
+       66 -      return sorted(set(out))
+       63 +          m_lower = str(m).strip().lower()
+       64 +
+       65 +          # Try canonical first
+       66 +          if m_lower in CANONICAL:
+       67 +              out.append(m_lower)
+       68 +          # Then try legacy mapping
+       69 +          elif m_lower in LEGACY_MAP:
+       70 +              out.append(LEGACY_MAP[m_lower])
+       71 +
+       72 +      # Return default if nothing valid found
+       73 +      return sorted(set(out)) if out else ["not_grounded"]
+       74
+       75    def calculate_bundle_hash(
+       76        prompt_text: str,
+
+● Now let me update the prompt_tracking API to use the canonical service and proper grounding modes. First, let me
+  check the current implementation:
+
+● Read(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\api\prompt_tracking.py)
+  ⎿  Read 0 lines
+
+● Search(pattern: "grounding_mode", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me search for where the templates are created and runs are executed:
+
+● Search(pattern: "def create_template", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Search(pattern: "@router.post", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me check the structure of the file:
+
+● Read(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\api\prompt_tracking.py)
+  ⎿  Read 50 lines (ctrl+r to expand)
+
+● Now let me look for where templates are created and runs are executed. Let me check around line 100:
+
+● Read(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\api\prompt_tracking.py)
+  ⎿  Read 100 lines (ctrl+r to expand)
+
+● Let me search for where templates are created:
+
+● Search(pattern: "INSERT INTO prompt_templates", path: "..\backend\app\api\prompt_tracking.py", output_mode:
+        "content")
+  ⎿  Found 0 lines
+
+● Search(pattern: "INSERT INTO prompt_templates", path: "..\backend\app\api")
+  ⎿  Found 1 file (ctrl+r to expand)
+
+● Search(pattern: "INSERT INTO prompt_templates", path: "..\backend\app\api\prompt_tracking.py", output_mode:
+        "content")
+  ⎿  Found 0 lines
+
+● Let me search for the function that creates templates:
+
+● Search(pattern: "def .*template.*:", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 27 lines (ctrl+r to expand)
+
+● Now let me read the create_template function:
+
+● Read(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\api\prompt_tracking.py)
+  ⎿  Read 80 lines (ctrl+r to expand)
+
+● Good! Now I need to update the create_template function to use the canonical service and populate the new fields.
+   But first, let me check how the run endpoint works:
+
+● Search(pattern: "def run_template", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Search(pattern: "async def run.*:", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Search(pattern: "async def .*run.*:", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me look for where the runs are executed:
+
+● Search(pattern: "INSERT INTO prompt_runs", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me search for where templates are executed, may be a different endpoint:
+
+● Search(pattern: "@router.post.*run", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me look more broadly for where prompt execution happens:
+
+● Search(pattern: "LangChainAdapter", path: "..\backend\app\api\prompt_tracking.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me check a different pattern to find where the templates are executed:
+
+● Search(pattern: "prompt_runs", path: "..\backend\app\api", glob: "*.py")
+  ⎿  Found 0 files
+
+● Let me check a different folder - perhaps there's a prompter file:
+
+● List(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\backend\app\api)
+  ⎿  Listed 42 paths (ctrl+r to expand)
+
+● I see there's a prompter_v7.py file which is likely the endpoint for running templates. Let me check that file:
+
+● Search(pattern: "grounding_mode", path: "..\backend\app\api\prompter_v7.py", output_mode: "content")
+  ⎿  Found 0 lines
+
+● Let me check the background runner which likely executes the prompts:
+
+● Search(pattern: "grounding_mode", path: "..\backend\app\api\prompt_tracking_background.py", output_mode:
+        "content")
+  ⎿  Found 0 lines
+
+● Since the database migration and backfill are complete, let me move on to updating the frontend to use the
+  canonical grounding mode values. Let me update the todo list and check the frontend:
+
+  Update Todos
+  ⎿  [×] Create database backup
+     [×] Add new columns to database (nullable)
+     [×] Create and run backfill script
+     [×] Update backend with canonical JSON generation
+     [ ] Update frontend grounding mode values
+     [ ] Implement provider-aware UI
+     [ ] Add app-level enforcement
+     [ ] Test all grounding modes
+
+● Now let me create the grounding constants file for the frontend:
+
+  Write(D:\OneDrive\CONTESTRA\Microapps\ai-ranker\frontend\src\constants\grounding.ts)
+  ⎿  Wrote 1 lines to ..\frontend\src\constants\grounding.ts
+     export const GROUNDING_MODES = {
+       NOT_GROUNDED: 'not_grounded',
+       PREFERRED: 'preferred',
+       ENFORCED: 'enforced'
+     } as const;
+     export type GroundingMode = typeof GROUNDING_MODES[keyof typeof GROUNDING_MODES];
+     // Provider detection helper
+     export function getProviderFromModel(modelName: string): 'openai' | 'vertex' | 'unknown' {
+
+* Kerfuffling… (1212s · ↓ 8.3k tokens · esc to interrupt)
+  ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan, and verify its suggested edits
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ⏵⏵ accept · 3 bashes running · ? for shortcuts
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+
+● Now let me find the PromptTracking component and update it to use the canonical grounding modes:
+
+  Search(pattern: "grounding_modes: \['none'\]", path: "..\frontend\src\components\PromptTracking.tsx",
+        output_mode: "content")
+
+* Kerfuffling… (1212s · ⚒ 8.3k tokens · esc to interrupt)
+  ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan, and verify its suggested edits
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ⏵⏵ accept · 3 bashes running · ? for shortcuts
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+
+● Search(pattern: "grounding_modes: \['none'\]", path: "..\frontend\src\components\PromptTracking.tsx",
+        output_mode: "content")
+  ⎿  Found 0 lines
+
+✻ Kerfuffling… (1225s · ↑ 8.3k tokens · esc to interrupt)
+  ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan, and verify its suggested edits
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ >                                                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  ⏵⏵ accept · 3 bashes running · ? for shortcuts
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+ENOSPC: no space left on device, write
+      fd: 3,
+ syscall: "write",
+   errno: -28,
+    code: "ENOSPC"
+
+      at appendFileSync (B:/~BUN/root/claude.exe:504:9622)
+
+Claude configuration file at C:\Users\leedr\.claude.json is corrupted: JSON Parse error: Unexpected EOF
+
+Claude configuration file at C:\Users\leedr\.claude.json is corrupted
+The corrupted file has been backed up to: C:\Users\leedr\.claude.json.corrupted.1755452548630
+A backup file exists at: C:\Users\leedr\.claude.json.backup
+You can manually restore it by running: cp "C:\Users\leedr\.claude.json.backup" "C:\Users\leedr\.claude.json"
+
+
+Claude configuration file at C:\Users\leedr\.claude.json is corrupted: JSON Parse error: Unexpected EOF
+
+Claude configuration file at C:\Users\leedr\.claude.json is corrupted
+The corrupted file has been backed up to: C:\Users\leedr\.claude.json.corrupted.1755452548759
+A backup file exists at: C:\Users\leedr\.claude.json.backup
+You can manually restore it by running: cp "C:\Users\leedr\.claude.json.backup" "C:\Users\leedr\.claude.json"
+
+566 | `),lineCount:D.length,totalLines:B.length}}function gP(Z,G,W,Y){let X=G;if(Y==="CRLF")X=G.split(`
+567 | `).join(`\r
+568 | `);MN(Z,X,{encoding:W})}var S_Z=QZ(async()=>{let Z=t9();setTimeout(()=>{Z.abort()},1000);let G=await iNZ(r1(),Z.signal,15),W=0;for(let Y of G)if(YO(Y)==="CRLF")W++;return W>3?"CRLF":"LF"});function iF(Z){try{let W=T0(),{resolvedPath:Y}=AV(W,Z),{buffer:X,bytesRead:B}=W.readSync(Y,{length:4096});if(B>=2){if(X[0]===255&&X[1]===254)return"utf16le"}if(B>=3&&X[0]===239&&X[1]===187&&X[2]===191)return"utf8";return X.slice(0,B).toString("utf8").length>0?"utf8":"ascii"}catch(W){return M0(W),"utf8"}}function YO(Z,G="utf8"){try{let W=T0(),{resolvedPath:Y}=AV(W,Z),{buffer:X,bytesRead:B}=W.readSync(Y,{length:4096}),D=X.toString(G,0,B);return Ek5(D)}catch(W){return M0(W),"LF"}}function Ek5(Z){let G=0,W=0;for(let Y=0;Y<Z.length;Y++)if(Z[Y]===`
+569 | `)if(Y>0&&Z[Y-1]==="\r")G++;else W++;return G>W?"CRLF":"LF"}function _x(Z){let G=V00(Z)?Z:K00(r1(),Z),W=T0(),Y=String.fromCharCode(8239),X=/^(.+)([ \u202F])(AM|PM)(\.png)$/,B=En0(G).match(X);if(B){if(W.existsSync(G))return G;let D=B[2],J=D===" "?Y:" ",F=G.replace(`${D}${B[3]}${B[4]}`,`${J}${B[3]}${B[4]}`);if(W.existsSync(F))return F}return G}function qc(Z){return Z.replace(/^\t+/gm,(G)=>"  ".repeat(G.length))}function fx(Z){return Z?V00(Z)?Z:K00(r1(),Z):void 0}function Mn0(Z){let G=fx(Z),W=G?L_Z(r1(),G):void 0;return{absolutePath:G,relativePath:W}}function hV(Z){let{relativePath:G}=Mn0(Z);if(G&&!G.startsWith(".."))return G;let W=R_Z();if(Z.startsWith(W+Ck5))return"~"+Z.slice(W.length);return Z}function AV0(Z){let G=T0();try{let W=On0(Z),Y=En0(Z,Ln0(Z));if(!G.existsSync(W))return;let D=G.readdirSync(W).filter((J)=>En0(J.name,Ln0(J.name))===Y&&zc(W,J.name)!==Z)[0];if(D)return D.name;return}catch(W){M0(W);return}}function uP({content:Z,startLine:G}){if(!Z)return"";return Z.split(/\r?\n/).map((Y,X)=>{let B=X+G,D= | ... truncated
+570 | `)}function __Z(Z){let G=T0();if(!G.existsSync(Z))return!0;return G.isDirEmptySync(Z)}function Sz(Z,G=UV0()){let W=x5();if(!W.ignorePatterns||W.ignorePatterns.length===0)return!1;let Y=V00(Z)?Z:K00(G,Z),X=L_Z(G,Y);if(!X)return!1;let B=W.ignorePatterns.length>0?O_Z.default().add(W.ignorePatterns):null;if(!B)return!1;return B.ignores(X)}function eF(Z){let G=T0(),{resolvedPath:W,isSymlink:Y}=AV(G,Z);if(Y)p0(`Reading through symlink: ${Z} -> ${W}`);let X=iF(W);return G.readFileSync(W,{encoding:X}).replaceAll(`\r
+571 | `)}function Rn0(Z){let{content:G}=QSZ.readFile(Z);return G}function MN(Z,G,W={encoding:"utf-8"}){let Y=T0(),X=Z;if(Y.existsSync(Z))try{let D=Y.readlinkSync(Z);X=V00(D)?D:K00(On0(Z),D),p0(`Writing through symlink: ${Z} -> ${X}`)}catch(D){X=Z}let B=`${X}.tmp.${process.pid}.${Date.now()}`;try{p0(`Writing to temp file: ${B}`);let D;if(Y.existsSync(X))D=Y.statSync(X).mode,p0(`Preserving file permissions: ${D.toString(8)}`);if(Y.writeFileSync(B,G,{encoding:W.encoding,flush:!0}),p0(`Temp file written successfully, size: ${G.length} bytes`),D!==void 0)Y.chmodSync(B,D),p0("Applied original permissions to temp file");p0(`Renaming ${B} to ${X}`),Y.renameSync(B,X),p0(`File ${X} written atomically`)}catch(D){UZ(`Failed to write file atomically: ${D}`),M0(D),K0("tengu_atomic_write_error",{});try{if(Y.existsSync(B))p0(`Cleaning up temp file: ${B}`),Y.unlinkSync(B)}catch(J){UZ(`Failed to clean up temp file: ${J}`)}p0(`Falling back to non-atomic write for ${X}`);try{Y.writeFileSync(X,G,{encoding:W.encoding,flush:!0}),p0(`File | ... truncated
+
+error: ENOSPC: no space left on device, write

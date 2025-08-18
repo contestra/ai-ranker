@@ -1,6 +1,6 @@
 """
 SQLAlchemy models for Prompt Tracking feature
-Works with both SQLite (local) and PostgreSQL (production)
+Works with PostgreSQL (Neon) for all environments
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, Text, ForeignKey, JSON
@@ -17,8 +17,8 @@ class PromptTemplate(Base):
     prompt_text = Column(Text, nullable=False)
     prompt_hash = Column(String(64), index=True)  # SHA256 hash of prompt_text for integrity checking
     prompt_type = Column(String, default="custom")
-    countries = Column(JSON, default=list)  # JSON for SQLite/PostgreSQL compatibility
-    grounding_modes = Column(JSON, default=list)  # JSON for SQLite/PostgreSQL compatibility
+    countries = Column(JSON, default=list)  # JSON for PostgreSQL compatibility
+    grounding_modes = Column(JSON, default=list)  # JSON for PostgreSQL compatibility
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

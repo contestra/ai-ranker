@@ -10,8 +10,8 @@ class Brand(Base):
     name = Column(String, unique=True, index=True, nullable=False)
     domain = Column(String)
     wikidata_qid = Column(String)
-    aliases = Column(JSON, default=list)  # Using JSON for SQLite compatibility
-    category = Column(JSON, default=list)  # Using JSON for SQLite compatibility
+    aliases = Column(JSON, default=list)  # Using JSON for database compatibility
+    category = Column(JSON, default=list)  # Using JSON for database compatibility
     use_canonical_entities = Column(Boolean, default=True)  # Group variations
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

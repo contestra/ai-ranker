@@ -78,26 +78,46 @@ LLM Providers (OpenAI, Google, Anthropic)
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL
+- Neon PostgreSQL account (no local database needed)
 - API Keys: OpenAI, Google Cloud (optional), Anthropic (optional)
 
 ### Environment Setup
 
 ```bash
-# Backend .env
+# Backend .env.development
+DATABASE_URL=postgresql+psycopg://user:pass@ep-xxx.region.aws.neon.tech/dbname?sslmode=require
 OPENAI_API_KEY=your_key
 GOOGLE_API_KEY=your_key  # Optional
 ANTHROPIC_API_KEY=your_key  # Optional
-DATABASE_URL=postgresql://user:pass@localhost/airanker
 UPSTASH_REDIS_URL=your_redis_url  # Optional
 ```
 
-### Database Setup
+### Database Setup (Neon PostgreSQL)
+
+This project uses Neon PostgreSQL as the single database for development, preview, and production environments. No local PostgreSQL or SQLite is required.
 
 ```bash
+# Set up environment variables
 cd backend
-python create_tables.py
+export $(grep -v '^#' .env.development | xargs)
+
+# Run migrations
+make dev-db
+# or manually:
+alembic upgrade head
 ```
+
+### CI/CD Database Strategy
+
+- **Development**: Uses Neon `dev` branch
+- **Pull Requests**: Automatically creates isolated Neon preview branches
+- **Production**: Uses Neon `main` branch
+
+Preview branches are automatically:
+- Created when PR is opened
+- Migrated with latest schema
+- Used for running tests
+- Deleted when PR is closed
 
 ## 🎯 WordPress Plugin
 

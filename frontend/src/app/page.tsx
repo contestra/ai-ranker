@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import PromptTracking from '@/components/PromptTracking'
+import PromptTracking from '@/components/PromptTrackingFixed'
 import Settings from '@/components/Settings'
 import ExperimentalTools from '@/components/ExperimentalTools'
 import SystemStatus from '@/components/SystemStatus'

@@ -13,7 +13,7 @@ class Organization(Base):
     """Organization for multi-tenant support"""
     __tablename__ = "organizations"
     
-    id = Column(String, primary_key=True)  # UUID as string for SQLite compatibility
+    id = Column(String, primary_key=True)  # UUID as string
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -72,7 +72,7 @@ class PromptTemplateV7(Base):
     runs_v7 = relationship("PromptRunV7", back_populates="template")
     
     # Unique constraint for active templates only (partial index)
-    # Note: SQLite doesn't support partial indexes via SQLAlchemy directly
+    # PostgreSQL supports partial indexes for better performance
     # This will be handled in the migration/schema SQL
     __table_args__ = (
         Index("ix_prompt_templates_v7_org_ws_hash", "org_id", "workspace_id", "config_hash"),

@@ -84,7 +84,7 @@ async def get_templates(brand_name: Optional[str] = None):
         
         templates = []
         for row in result:
-            # Handle JSON strings for SQLite compatibility
+            # Handle JSON strings for backward compatibility
             countries = row.countries
             if isinstance(countries, str):
                 import json as json_lib
@@ -95,7 +95,7 @@ async def get_templates(brand_name: Optional[str] = None):
                 import json as json_lib
                 grounding_modes = json_lib.loads(grounding_modes)
             
-            # Handle datetime - SQLite returns string, PostgreSQL returns datetime
+            # Handle datetime formats
             created_at = row.created_at
             if created_at and hasattr(created_at, 'isoformat'):
                 created_at = created_at.isoformat()
@@ -103,9 +103,52 @@ async def get_templates(brand_name: Optional[str] = None):
             # Get model_name with fallback to default
             model_name = row.model_name if hasattr(row, 'model_name') and row.model_name else 'gemini'
             
+            # Derive provider from model name
+            provider = row.provider if hasattr(row, 'provider') and row.provider else None
+            if not provider:
+                if 'gpt' in model_name.lower():
+                    provider = 'openai'
+                elif 'gemini' in model_name.lower() or 'bison' in model_name.lower():
+                    provider = 'vertex'
+                else:
+                    provider = 'unknown'
+            
             # Get prompt hash (first 8 chars for display)
             prompt_hash = row.prompt_hash if hasattr(row, 'prompt_hash') and row.prompt_hash else None
             prompt_hash_short = prompt_hash[:8] + "..." if prompt_hash else None
+            
+            # Get template stats (last run and total runs)
+            template_id = row.id
+            with engine.connect() as stats_conn:
+                stats_query = text("""
+                    SELECT 
+                        MAX(created_at) as last_run_at,
+                        COUNT(*) as total_runs,
+                        COUNT(CASE WHEN status = 'completed' THEN 1 END) as successful_runs
+                    FROM prompt_runs
+                    WHERE template_id = :template_id
+                """)
+                stats_result = stats_conn.execute(stats_query, {"template_id": template_id}).fetchone()
+                
+                last_run_at = None
+                total_runs = 0
+                successful_runs = 0
+                
+                if stats_result:
+                    last_run_at = stats_result.last_run_at
+                    if last_run_at and hasattr(last_run_at, 'isoformat'):
+                        last_run_at = last_run_at.isoformat()
+                    total_runs = stats_result.total_runs or 0
+                    successful_runs = stats_result.successful_runs or 0
+            
+            # Get canonical JSON if available
+            canonical_json = row.canonical_json if hasattr(row, 'canonical_json') and row.canonical_json else None
+            
+            # Get system parameters
+            temperature = row.temperature if hasattr(row, 'temperature') else 0.7
+            seed = row.seed if hasattr(row, 'seed') else None
+            top_p = row.top_p if hasattr(row, 'top_p') else 1.0
+            max_tokens = row.max_tokens if hasattr(row, 'max_tokens') else None
             
             templates.append({
                 "id": row.id,
@@ -114,12 +157,21 @@ async def get_templates(brand_name: Optional[str] = None):
                 "prompt_text": row.prompt_text,
                 "prompt_type": row.prompt_type,
                 "model_name": model_name,
+                "provider": provider,
                 "countries": countries,
                 "grounding_modes": grounding_modes,
                 "is_active": row.is_active,
                 "created_at": created_at,
                 "prompt_hash": prompt_hash_short,
-                "prompt_hash_full": prompt_hash
+                "prompt_hash_full": prompt_hash,
+                "last_run_at": last_run_at,
+                "total_runs": total_runs,
+                "successful_runs": successful_runs,
+                "canonical_json": canonical_json,
+                "temperature": temperature,
+                "seed": seed,
+                "top_p": top_p,
+                "max_tokens": max_tokens
             })
         
         return {"templates": templates}
@@ -283,7 +335,7 @@ async def create_template(template: PromptTemplate):
             RETURNING id
         """)
         
-        # Convert arrays to JSON strings for SQLite
+        # Convert arrays to JSON strings
         import json as json_lib
         countries_json = json_lib.dumps(template.countries)
         modes_json = json_lib.dumps(template.grounding_modes)
@@ -408,6 +460,9 @@ async def run_prompt(request: PromptRunRequest):
     countries = request.countries or template_countries or ["US"]
     grounding_modes = request.grounding_modes or template_modes or ["none"]
     
+    # Use the model from the template (NOT from request which may be None)
+    model_name = template.model_name
+    
     # Check if we need parallel execution (more than 2 tests)
     total_tests = len(countries) * len(grounding_modes)
     
@@ -416,7 +471,7 @@ async def run_prompt(request: PromptRunRequest):
         results = await run_parallel_tests(
             request.template_id,
             request.brand_name,
-            request.model_name,
+            model_name,  # Use template's model_name
             prompt_text,
             countries,
             grounding_modes
@@ -447,7 +502,7 @@ async def run_prompt(request: PromptRunRequest):
                     run_result = conn.execute(run_query, {
                         "template_id": request.template_id,
                         "brand": request.brand_name,
-                        "model": request.model_name,
+                        "model": model_name,  # Use template's model_name
                         "country": country_iso,  # Store ISO in DB for display
                         "grounding": grounding_mode
                     })
@@ -504,7 +559,7 @@ async def run_prompt(request: PromptRunRequest):
                     print(f"\n{'='*60}")
                     print(f"PROMPT TRACKING API - ABOUT TO SEND:")
                     print(f"Using numeric ID: {country_num} internally (never passing ISO '{country_iso}' to AI)")
-                    print(f"Model: {request.model_name}")
+                    print(f"Model: {model_name}")
                     print(f"Naked Prompt: {full_prompt[:100]}...")
                     print(f"Has Ambient Block: {bool(context_message)}")
                     if context_message:
@@ -516,31 +571,70 @@ async def run_prompt(request: PromptRunRequest):
                     seed = 42  # Fixed seed for reproducibility
                     
                     # Get model response based on selected model
-                    # Now passing context as SEPARATE parameter, not concatenated!
-                    if request.model_name in ["gemini", "gemini-flash"]:
+                    # Use model registry for canonical routing - NEVER route by ad-hoc string checks
+                    from app.llm.model_registry import resolve_model
+                    
+                    try:
+                        mi = resolve_model(model_name)
+                    except ValueError as e:
+                        print(f"[ERROR] Model resolution failed: {e}")
+                        # Fallback for unknown models - try Gemini
+                        mi = None
+                    
+                    # Import grounding enforcement
+                    from app.services.grounding_enforcement import (
+                        normalize_grounding_mode, 
+                        should_use_grounding,
+                        is_grounding_enforced,
+                        validate_grounding_result
+                    )
+                    
+                    # Normalize grounding mode to canonical value
+                    canonical_mode = normalize_grounding_mode(grounding_mode)
+                    
+                    # Vertex/Gemini doesn't support true enforcement - downgrade to preferred
+                    if canonical_mode == "enforced" and model_name and "gemini" in model_name.lower():
+                        print(f"[WARNING] Gemini models don't support enforced grounding - using preferred instead")
+                        canonical_mode = "preferred"
+                    
+                    needs_grounding = should_use_grounding(canonical_mode)
+                    grounding_forced = is_grounding_enforced(canonical_mode)
+                    
+                    # Log routing decision
+                    if mi:
+                        print(f"[ROUTE] provider={mi.provider} model={mi.canonical_id} "
+                              f"response_api={mi.response_api} mode={canonical_mode} needs_grounding={needs_grounding} "
+                              f"force={grounding_forced}", flush=True)
+                    
+                    # Route by provider with explicit grounding flags
+                    if mi and mi.provider == "vertex":
+                        # Vertex Gemini models
                         response_data = await adapter.analyze_with_gemini(
                             full_prompt,  # Naked prompt
-                            grounding_mode == "web",  # Enable grounding for web mode
-                            model_name="gemini-2.0-flash-exp" if request.model_name == "gemini-flash" else "gemini-2.5-pro",
-                            temperature=temperature,
-                            seed=seed,
-                            context=context_message  # Context as separate parameter
-                        )
-                    elif request.model_name in ["gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-4o", "gpt-4o-mini"]:
-                        # Use GPT models with REAL grounding support now!
-                        response_data = await adapter.analyze_with_gpt4(
-                            full_prompt,  # Naked prompt
-                            model_name=request.model_name,
+                            use_grounding=needs_grounding,  # Pass explicit boolean
+                            model_name=mi.canonical_id,  # Use canonical ID
                             temperature=temperature,
                             seed=seed,
                             context=context_message,  # Context as separate parameter
-                            use_grounding=(grounding_mode == "web")  # NOW ACTUALLY WORKS!
+                            top_p=1.0
+                        )
+                    elif mi and mi.provider == "openai":
+                        # OpenAI models
+                        response_data = await adapter.analyze_with_gpt4(
+                            full_prompt,  # Naked prompt
+                            model_name=mi.canonical_id,  # Use canonical ID
+                            temperature=temperature,
+                            seed=seed,
+                            context=context_message,  # Context as separate parameter
+                            use_grounding=needs_grounding  # Pass explicit boolean
                         )
                     else:
-                        # Default fallback to Gemini
+                        # Fallback for unknown models - try Gemini
+                        print(f"[WARNING] Unknown model '{model_name}', attempting Gemini fallback")
                         response_data = await adapter.analyze_with_gemini(
                             full_prompt,  # Naked prompt
-                            grounding_mode == "web",
+                            use_grounding=needs_grounding,
+                            model_name=model_name,  # Pass original name
                             temperature=temperature,
                             seed=seed,
                             context=context_message  # Context as separate parameter
@@ -550,8 +644,8 @@ async def run_prompt(request: PromptRunRequest):
                     response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
                     
                     # Debug logging - ALWAYS log for Gemini to diagnose issue
-                    if request.model_name in ["gemini", "gemini-flash"] or not response or response.startswith("[ERROR]"):
-                        print(f"[DEBUG] Response for {request.model_name}: {response[:100] if response else 'EMPTY'}")
+                    if model_name.startswith("gemini") or not response or response.startswith("[ERROR]"):
+                        print(f"[DEBUG] Response for {model_name}: {response[:100] if response else 'EMPTY'}")
                         if isinstance(response_data, dict):
                             print(f"[DEBUG] Response data keys: {response_data.keys()}")
                             print(f"[DEBUG] Content field: {response_data.get('content', 'MISSING')[:100] if response_data.get('content') else 'EMPTY/MISSING'}")
@@ -560,8 +654,37 @@ async def run_prompt(request: PromptRunRequest):
                     
                     # Extract grounding metadata
                     tool_call_count = response_data.get("tool_call_count", 0) if isinstance(response_data, dict) else 0
-                    grounded_effective = response_data.get("grounded_effective", False) if isinstance(response_data, dict) else False
+                    # Check both "grounded_effective" and "grounded" for compatibility
+                    grounded_effective = (response_data.get("grounded_effective", False) or 
+                                        response_data.get("grounded", False)) if isinstance(response_data, dict) else False
                     json_valid = response_data.get("json_valid", None) if isinstance(response_data, dict) else None
+                    
+                    # Validate grounding result meets requirements
+                    provider = mi.provider if mi else "unknown"
+                    is_valid, error_msg = validate_grounding_result(
+                        canonical_mode, grounded_effective, provider
+                    )
+                    
+                    # If grounding was enforced but didn't occur, handle the error
+                    if not is_valid and grounding_forced:
+                        print(f"[ERROR] Grounding enforcement failed: {error_msg}")
+                        # For Vertex, we can retry with a more explicit prompt
+                        if provider == "vertex" and not grounded_effective:
+                            print("[INFO] Retrying Vertex with explicit grounding instruction...")
+                            retry_prompt = f"Please search the web for current information to answer this: {full_prompt}"
+                            response_data = await adapter.analyze_with_gemini(
+                                retry_prompt,
+                                use_grounding=True,
+                                model_name=mi.canonical_id if mi else model_name,
+                                temperature=temperature,
+                                seed=seed,
+                                context=context_message,
+                                top_p=1.0
+                            )
+                            # Re-extract after retry
+                            response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
+                            grounded_effective = (response_data.get("grounded_effective", False) or 
+                                                response_data.get("grounded", False)) if isinstance(response_data, dict) else False
                     
                     # Extract safety and completion metadata
                     finish_reason = response_data.get("finish_reason", None) if isinstance(response_data, dict) else None
@@ -598,7 +721,7 @@ async def run_prompt(request: PromptRunRequest):
                             RETURNING id
                         """)
                         
-                        # Convert list to JSON string for SQLite
+                        # Convert list to JSON string
                         import json as json_lib
                         competitors_json = json_lib.dumps(competitors[:5] if competitors else [])
                         
@@ -626,13 +749,20 @@ async def run_prompt(request: PromptRunRequest):
                         """)
                         conn.execute(update_query, {"id": run_id})
                     
+                    # Extract grounding metadata from response_data if available
+                    grounding_metadata = response_data.get("grounding_metadata", {}) if isinstance(response_data, dict) else {}
+                    
                     results.append({
                         "run_id": run_id,
                         "country": country_iso,  # Return ISO for display
                         "grounding_mode": grounding_mode,
                         "brand_mentioned": brand_mentioned,
                         "mention_count": mention_count,
-                        "response_preview": response[:200] + "..." if len(response) > 200 else response
+                        "response": response,  # Include full response for testing
+                        "response_preview": response[:200] + "..." if len(response) > 200 else response,
+                        "grounded": grounded_effective,
+                        "grounding_metadata": grounding_metadata,
+                        "confidence_score": 0.8 if brand_mentioned else 0.3
                     })
                     
                 except Exception as e:
@@ -696,19 +826,89 @@ async def get_runs(
             prompt_hash = row.prompt_hash if hasattr(row, 'prompt_hash') and row.prompt_hash else None
             prompt_hash_short = prompt_hash[:8] + "..." if prompt_hash else None
             
+            # Derive provider from model name
+            model_name = row.model_name
+            provider = row.provider if hasattr(row, 'provider') and row.provider else None
+            if not provider:
+                if 'gpt' in model_name.lower():
+                    provider = 'openai'
+                elif 'gemini' in model_name.lower():
+                    provider = 'vertex'
+                else:
+                    provider = 'unknown'
+            
+            # Get additional provenance metadata if available  
+            response_api = row.response_api if hasattr(row, 'response_api') and row.response_api else None
+            grounding_mode_canonical = row.grounding_mode_canonical if hasattr(row, 'grounding_mode_canonical') and row.grounding_mode_canonical else row.grounding_mode
+            tool_choice = row.tool_choice if hasattr(row, 'tool_choice') and row.tool_choice else None
+            
+            # Get grounding results from prompt_results if available
+            grounded_effective = False
+            tool_call_count = 0
+            citations_count = 0
+            finish_reason = None
+            content_filtered = False
+            
+            # Fetch additional metadata from prompt_results
+            with engine.connect() as meta_conn:
+                meta_query = text("""
+                    SELECT 
+                        grounded_effective,
+                        tool_call_count,
+                        citations,
+                        finish_reason,
+                        content_filtered,
+                        system_fingerprint
+                    FROM prompt_results
+                    WHERE run_id = :run_id
+                """)
+                meta_result = meta_conn.execute(meta_query, {"run_id": row.id}).fetchone()
+                
+                if meta_result:
+                    grounded_effective = meta_result.grounded_effective if meta_result.grounded_effective else False
+                    tool_call_count = meta_result.tool_call_count if meta_result.tool_call_count else 0
+                    
+                    # Count citations if it's a JSON array
+                    citations = meta_result.citations
+                    if citations:
+                        try:
+                            import json as json_lib
+                            if isinstance(citations, str):
+                                citations_list = json_lib.loads(citations)
+                                citations_count = len(citations_list) if isinstance(citations_list, list) else 0
+                            elif isinstance(citations, list):
+                                citations_count = len(citations)
+                        except:
+                            citations_count = 0
+                    
+                    finish_reason = meta_result.finish_reason
+                    content_filtered = meta_result.content_filtered if meta_result.content_filtered else False
+                    system_fingerprint = meta_result.system_fingerprint
+            
             runs.append({
                 "id": row.id,
                 "template_id": row.template_id,
                 "brand_name": row.brand_name,
                 "model_name": row.model_name,
+                "provider": provider,
                 "country_code": row.country_code,
                 "grounding_mode": row.grounding_mode,
+                "grounding_mode_canonical": grounding_mode_canonical,
                 "status": row.status,
                 "started_at": row.started_at.isoformat() if row.started_at and hasattr(row.started_at, 'isoformat') else row.started_at,
                 "completed_at": row.completed_at.isoformat() if row.completed_at and hasattr(row.completed_at, 'isoformat') else row.completed_at,
                 "error_message": row.error_message,
                 "created_at": row.created_at.isoformat() if row.created_at and hasattr(row.created_at, 'isoformat') else row.created_at,
-                "prompt_hash": prompt_hash_short
+                "prompt_hash": prompt_hash_short,
+                "prompt_hash_full": prompt_hash,
+                # Provenance metadata
+                "response_api": response_api,
+                "tool_choice": tool_choice,
+                "grounded_effective": grounded_effective,
+                "tool_call_count": tool_call_count,
+                "citations_count": citations_count,
+                "finish_reason": finish_reason,
+                "content_filtered": content_filtered
             })
         
         return {"runs": runs}

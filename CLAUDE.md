@@ -20,9 +20,251 @@ set PYTHONUTF8=1
 
 **The fix is ALWAYS the same:** Set `PYTHONUTF8=1` before running Python!
 
+### Python Script UTF-8 Handling
+
+**CRITICAL**: When writing Python scripts on Windows that print Unicode characters (emojis, checkmarks, etc.):
+
+1. **Option 1 - Configure stdout for UTF-8** (Preferred):
+```python
+# Add at the top of any script that prints Unicode
+import sys, io
+sys.stdout.reconfigure(encoding='utf-8')  # Python 3.7+
+# OR for Python < 3.7:
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+```
+
+2. **Option 2 - Replace non-ASCII characters**:
+```python
+# Instead of: print("✅ Success")
+# Use: print("[SUCCESS]")
+# Or strip: text.encode('ascii', errors='replace').decode('ascii')
+```
+
+**DO NOT**: Keep removing emojis and re-adding them in a loop. Either configure UTF-8 properly or use ASCII-only text.
+
 ---
 
-## Latest Update (August 17, 2025) - Vertex AI ADC Setup & Import Refactoring ✅
+## 🚨 CRITICAL: NO FALLBACK TO DIRECT API ALLOWED
+
+### ABSOLUTE RULE: Fallback = System Failure
+**See [CRITICAL_NO_FALLBACK_ALLOWED.md](./CRITICAL_NO_FALLBACK_ALLOWED.md) for details**
+
+---
+
+## 🚨 CRITICAL: Shell Context on Windows - DO NOT RUN FROM GIT BASH!
+
+### The #1 Authentication Problem: Shell Context Mismatch
+
+**NEVER run Claude Code or the backend from Git Bash on Windows!**
+
+**The Problem:**
+- PowerShell creates ADC at: `C:\Users\USERNAME\AppData\Roaming\gcloud\application_default_credentials.json`
+- Git Bash looks for ADC at: `/c/Users/USERNAME/.config/gcloud/application_default_credentials.json`
+- **These are DIFFERENT locations!**
+
+**Result:** "Your default credentials were not found" error even when ADC exists!
+
+### The FASTEST FIX - Explicit ADC Path
+
+```powershell
+# In PowerShell - Bypass ALL path confusion
+$env:GOOGLE_APPLICATION_CREDENTIALS = "$env:APPDATA\gcloud\application_default_credentials.json"
+
+# Why this works:
+# - Google libraries check this env var FIRST
+# - Bypasses Bash/MSYS search paths entirely
+# - No symlinks needed (which often fail on Windows)
+# - Works from any shell after setting
+```
+
+### Where to Run Claude Code on Windows:
+✅ **PowerShell** (RECOMMENDED)
+✅ **Windows Command Prompt** (cmd.exe)
+✅ **Windows Terminal with PowerShell profile**
+
+❌ **NEVER from:**
+- Git Bash (unless you set GOOGLE_APPLICATION_CREDENTIALS explicitly)
+- WSL (Windows Subsystem for Linux)
+- MinGW
+- Cygwin
+
+### The Golden Rule:
+**Set GOOGLE_APPLICATION_CREDENTIALS explicitly to bypass all path issues!**
+
+If you must use different shells:
+1. Always set `GOOGLE_APPLICATION_CREDENTIALS` to the Windows ADC path
+2. This makes ADC work from ANY shell context
+3. No symlinks needed (they often fail anyway)
+
+**See [AUTHENTICATION.md](./AUTHENTICATION.md) for complete details and workarounds**
+
+---
+
+## 🔐 AUTHENTICATION - CRITICAL RULES
+
+### 🚨 CRITICAL AUTHENTICATION REQUIREMENTS:
+
+#### 1. MUST Grant TokenCreator Permission (Most Common Error!)
+```powershell
+# THIS IS REQUIRED - Without it, you get "Permission iam.serviceAccounts.getAccessToken denied"
+$SA = "vertex-runner@contestra-ai.iam.gserviceaccount.com"
+$USER = gcloud config get account  # Should be l@contestra.com
+
+gcloud iam service-accounts add-iam-policy-binding $SA `
+  --role="roles/iam.serviceAccountTokenCreator" `
+  --member="user:$USER" `
+  --project contestra-ai
+
+# Verify it worked:
+gcloud auth print-access-token --impersonate-service-account=$SA
+```
+
+#### 2. Use PowerShell on Windows (Not Git Bash/WSL)
+- Git Bash/WSL causes ADC to be written to wrong location
+- Must do everything in ONE PowerShell window
+- **CRITICAL**: Backend MUST also run in PowerShell, not Git Bash!
+- ADC paths are different: PowerShell uses `C:\Users\...\AppData\Roaming\gcloud\`
+- Git Bash looks for ADC at `/c/Users/.../.config/gcloud/` (won't find Windows ADC!)
+
+#### 3. CLI Impersonation is OK in PowerShell (Updated Understanding)
+```powershell
+# This WORKS in interactive PowerShell (after granting TokenCreator):
+gcloud config set auth/impersonate_service_account vertex-runner@contestra-ai.iam.gserviceaccount.com
+
+# But for headless/CI, use environment variable:
+$env:GOOGLE_IMPERSONATE_SERVICE_ACCOUNT="vertex-runner@contestra-ai.iam.gserviceaccount.com"
+```
+
+### ⚠️ For authentication issues with Vertex AI or OpenAI:
+**DO NOT** attempt to fix authentication issues directly. Instead:
+1. **IMMEDIATELY** use the `vertex-auth-guardian` agent via the Task tool
+2. This specialized agent knows to AVOID CLI-level impersonation
+3. It uses the correct env var approach that actually works
+
+**Example:**
+```
+If you see: "Vertex AI Authentication error", "ADC missing/expired", "Reauthentication required"
+→ Use Task tool with subagent_type="vertex-auth-guardian"
+```
+
+### Quick Fix Script:
+Use `RUN_THIS_TO_FIX_VERTEX.bat` which:
+- Removes CLI impersonation first (critical!)
+- Sets up ADC properly
+- Uses environment variables for impersonation
+- Sets persistent env vars with `setx`
+
+---
+
+## Latest Update (August 18, 2025) - Complete UI Testing & Authentication Documentation
+
+### ✅ Session Achievements
+
+**1. UI Restoration & Testing**:
+- Fixed broken Prompt Configuration Builder after shadcn updates
+- Verified GPT-5 shows 3 grounding modes (OFF, PREFERRED, REQUIRED)
+- Verified Gemini shows 2 grounding modes (Model Knowledge Only, Grounded)
+- Template metadata display working (SHA-256, canonical JSON, system parameters)
+- Results tab functional with proper status tracking
+
+**2. Authentication Fixed & Documented**:
+- Resolved Vertex AI authentication using proper ADC + Service Account impersonation
+- Created comprehensive **[AUTHENTICATION.md](./AUTHENTICATION.md)** merging all master documents
+- Key lesson: Use standard `gcloud auth application-default login` (even though it says "Sign in to gcloud CLI")
+- Set `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=vertex-runner@contestra-ai.iam.gserviceaccount.com`
+- No service account keys, no raw OAuth URLs
+
+**3. Documentation Consolidated**:
+- Merged 4 separate authentication documents into single source of truth
+- Added debugging tools, OIDC helper scripts, and clear DO/DON'T guidelines
+- Included both local development and production (Fly.io WIF) setup
+
+**Current System Status**:
+- Frontend: Running on port 3001 ✅
+- Backend: Running on port 8000 with proper env vars ✅
+- Authentication: ADC configured with SA impersonation ✅
+- UI: All features functional and tested ✅
+
+---
+
+## Previous Update (August 18, 2025) - UI Restoration & Prompt Builder Fix
+
+### 🔧 Session Summary
+**Task**: Fixed broken UI after shadcn component updates that removed the prompt configuration builder functionality.
+
+**Problems Solved**:
+1. ✅ **Prompt Builder Restored**: Created PromptTrackingFixed.tsx with complete configuration builder
+2. ✅ **Grounding Modes Fixed**: GPT models now show OFF/PREFERRED/REQUIRED, Gemini shows Model Knowledge Only/Grounded
+3. ✅ **Metadata Display**: Added all missing metadata (SHA-256 hashes, canonical JSON, system parameters)
+4. ✅ **Template Management**: Copy, expand, and run operations all working
+5. ✅ **Simultaneous Runs**: Fixed global loading state that prevented running multiple templates
+
+**Key Implementation Details**:
+- **Component**: `frontend/src/components/PromptTrackingFixed.tsx` - Complete rewrite with all features
+- **Templates Tab**: Shows canonical JSON, SHA-256, temperature/seed/top_p, provider badges
+- **Results Tab**: Displays provenance strips, grounding metadata, citations, cross-linking
+- **Configuration Builder**: Select countries, grounding modes, models to generate immutable prompts
+
+**Current Status**:
+- Frontend: Running on port 3001 ✅
+- Backend: Running on port 8000 ✅
+- UI: Fully functional with real API data ✅
+- Vertex Auth: Needs reauthentication (fallback to direct API working)
+
+**Note**: System is operational despite Vertex auth issue - falls back to direct Gemini API for non-grounded queries.
+
+---
+
+## Previous Update (August 17, 2025 Evening) - UI Enhancements with Shadcn/UI ✅
+
+### 🎨 Professional UI Upgrade Complete
+**Major Achievement**: Transformed the Prompt Tracking interface with shadcn/ui components for a modern, professional experience.
+
+**What's New**:
+- **Shadcn/UI Integration**: Added 9 components (Card, Sheet, Accordion, Badge, etc.)
+- **Enhanced Templates Tab**: Provider badges, run statistics, expandable configuration drawer
+- **Enhanced Results Tab**: Provenance strips, citations, cross-linking to templates
+- **Null Safety**: Fixed all runtime errors with proper TypeScript handling
+- **Empty States**: Graceful fallbacks when no data exists
+
+**Key Features**:
+- ✅ Expandable drawers (600px Sheet components) for detailed views
+- ✅ Accordion sections for organized metadata display
+- ✅ Color-coded provider badges (green=OpenAI, blue=Vertex)
+- ✅ SHA-256 hash display for configuration integrity
+- ✅ Clickable citations with external link icons
+- ✅ Cross-navigation between templates and results
+
+**Critical Fix**: Frontend MUST run on port 3001 (`npm run dev -- -p 3001`), port 3000 is occupied.
+
+**Testing Note**: Playwright MCP configured but requires session restart to activate. Use for automated testing in next session.
+
+See `UI_ENHANCEMENTS_IMPLEMENTATION.md` for complete implementation details.
+
+## Previous Update (August 17, 2025 Afternoon) - Grounding & Routing FULLY FIXED ✅
+
+### 🚀 CRITICAL FIXES COMPLETED - System Fully Operational
+
+**Major Issues Resolved**:
+1. **Citation Validation Error** ✅ - Vertex citations now properly coerced from strings to dicts
+2. **Model Routing Bug** ✅ - gemini-2.5-pro no longer sent to OpenAI (was causing 404 errors)
+3. **Grounding Flag Propagation** ✅ - Templates with web mode now properly activate grounding
+
+**Solution Components**:
+- **Model Registry** (`app/llm/model_registry.py`) - Single source of truth for routing
+- **Defensive Validators** - Citations auto-convert to proper format
+- **Provider Guards** - Prevent models from being sent to wrong API
+- **Explicit Routing** - Models route by provider, not ad-hoc string matching
+
+**Working Models**:
+- ✅ gemini-2.5-pro (Vertex + Grounding)
+- ✅ gemini-2.0-flash (Vertex + Grounding)  
+- ✅ gpt-5 models (OpenAI + Web Search)
+- ✅ Frontend Templates & Results tabs
+
+See `GROUNDING_AND_ROUTING_FIX_COMPLETE.md` for implementation details.
+
+## Previous Update (August 17, 2025 AM) - Vertex AI ADC Setup & Import Refactoring ✅
 
 ### 🎯 Major Fix: Vertex AI Now Working Locally with ADC
 **Problem Solved**: Vertex AI was falling back to direct API due to missing Application Default Credentials

@@ -10,6 +10,13 @@
 
 This is a **suite of integrated tools/features**, not a single application. When working on ANY feature, you MUST:
 
+### 0. NEVER ALLOW FALLBACK TO DIRECT API
+**See [CRITICAL_NO_FALLBACK_ALLOWED.md](./CRITICAL_NO_FALLBACK_ALLOWED.md)**
+- Vertex AI authentication MUST work properly
+- NO fallback to direct Gemini API
+- System is either FULLY WORKING or COMPLETELY DOWN
+- Fallback = Security Breach
+
 ### 1. NEVER MODIFY SHARED COMPONENTS WITHOUT EXPLICIT PERMISSION
 - System prompts used by multiple features
 - Core utility functions

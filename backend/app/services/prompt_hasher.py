@@ -33,26 +33,44 @@ def _normalize_countries(countries: Optional[Iterable[str]]) -> List[str]:
     return sorted(set(out))
 
 def _normalize_modes(modes: Optional[Iterable[str]]) -> List[str]:
-    """Normalize grounding modes to canonical keys."""
-    # Map various representations to canonical
-    MAP = {
-        "MODEL KNOWLEDGE ONLY": "none",
-        "MODEL_ONLY": "none",
-        "UNGROUNDED": "none",
-        "NONE": "none",
-        "GROUNDED (WEB SEARCH)": "web",
-        "WEB": "web",
-        "WEB_SEARCH": "web",
-        "GROUNDED": "web",
+    """Normalize grounding modes to canonical values."""
+    if not modes:
+        return ["not_grounded"]  # Default when empty
+    
+    CANONICAL = {"not_grounded", "preferred", "enforced"}
+    
+    # For backward compatibility during migration
+    LEGACY_MAP = {
+        "off": "not_grounded",
+        "none": "not_grounded",
+        "ungrounded": "not_grounded",
+        "model knowledge only": "not_grounded",
+        "model_only": "not_grounded",
+        "web": "preferred",
+        "grounded": "preferred",
+        "grounded (web search)": "preferred",
+        "web_search": "preferred",
+        "auto": "preferred",
+        "preferred": "preferred",
+        "required": "enforced",
+        "enforced": "enforced"
     }
+    
     out = []
-    for m in modes or []:
+    for m in modes:
         if not m:
             continue
-        k = str(m).strip().upper()
-        k = MAP.get(k, m.lower())  # Use mapping or lowercase original
-        out.append(k)
-    return sorted(set(out))
+        m_lower = str(m).strip().lower()
+        
+        # Try canonical first
+        if m_lower in CANONICAL:
+            out.append(m_lower)
+        # Then try legacy mapping
+        elif m_lower in LEGACY_MAP:
+            out.append(LEGACY_MAP[m_lower])
+    
+    # Return default if nothing valid found
+    return sorted(set(out)) if out else ["not_grounded"]
 
 def calculate_bundle_hash(
     prompt_text: str,

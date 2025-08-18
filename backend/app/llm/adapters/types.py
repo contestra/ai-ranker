@@ -5,7 +5,7 @@ Production-grade type definitions with Pydantic
 
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class GroundingMode(str, Enum):
     """Grounding mode semantics for web search"""
@@ -48,6 +48,22 @@ class RunResult(BaseModel):
     system_fingerprint: Optional[str] = Field(None, description="Model version fingerprint")
     usage: Dict[str, int] = Field(default_factory=dict, description="Token usage statistics")
     meta: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+    
+    @field_validator("citations", mode="before")
+    @classmethod
+    def _coerce_citations(cls, v):
+        """Defensive validator: coerce list[str] → list[{"uri": ...}] to prevent production breakage"""
+        if not v: 
+            return []
+        out = []
+        for x in (v if isinstance(v, list) else [v]):
+            if isinstance(x, dict): 
+                out.append(x)
+            elif isinstance(x, str): 
+                out.append({"uri": x, "title": "No title", "source": "web_search"})
+            else: 
+                out.append({"note": str(x)})
+        return out
 
 class LocaleProbeSchema(BaseModel):
     """Standard schema for locale probe responses"""

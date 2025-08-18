@@ -62,7 +62,7 @@ class PhraseResult(Base):
     
     # Results
     response_text = Column(Text)
-    brands_found = Column(JSON)  # List of brands found (JSON for SQLite compatibility)
+    brands_found = Column(JSON)  # List of brands found
     target_brand_position = Column(Integer)  # Position of our brand (if found)
     target_brand_mentioned = Column(Boolean, default=False)
     
@@ -78,7 +78,7 @@ class ThresholdResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     brand_id = Column(Integer, ForeignKey("brands.id"), nullable=False)
     base_prompt = Column(Text)
-    modifiers = Column(JSON)  # List of modifier words (JSON for SQLite compatibility)
+    modifiers = Column(JSON)  # List of modifier words
     triggers_mention = Column(Boolean)
     token_position = Column(Integer)  # Position where brand first appears
     confidence_score = Column(Float)

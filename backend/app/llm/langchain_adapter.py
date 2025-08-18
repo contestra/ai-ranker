@@ -244,15 +244,23 @@ class LangChainAdapter:
             context: Optional context/evidence pack as separate message
             top_p: Top-p for nucleus sampling
         """
+        # GUARD: Ensure only Gemini models are processed here
+        if "gpt" in model_name.lower() and "gemini" not in model_name.lower():
+            raise ValueError(f"OpenAI model '{model_name}' incorrectly routed to Gemini adapter. This is a routing bug.")
+        
         # Try Vertex AI first (works in production with WEF)
         from app.llm.adapters.vertex_genai_adapter import VertexGenAIAdapter
         
+        print(f"[GROUNDING DEBUG] analyze_with_gemini called with use_grounding={use_grounding}, model={model_name}")
+        
         try:
+            print(f"[GROUNDING DEBUG] Creating VertexGenAIAdapter...")
             vertex_adapter = VertexGenAIAdapter(
                 project="contestra-ai",
                 location="europe-west4"
             )
             
+            print(f"[GROUNDING DEBUG] Calling vertex_adapter.analyze_with_gemini with use_grounding={use_grounding}")
             result = await vertex_adapter.analyze_with_gemini(
                 prompt=prompt,
                 use_grounding=use_grounding,
@@ -263,14 +271,15 @@ class LangChainAdapter:
                 top_p=top_p
             )
             
-            print(f"[DEBUG] Vertex succeeded, returning result")
+            print(f"[GROUNDING DEBUG] Vertex succeeded! Result keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
+            print(f"[GROUNDING DEBUG] Grounded: {result.get('grounded', 'N/A')}, API used: {result.get('api_used', 'vertex')}")
             return result
             
         except Exception as e:
-            print(f"[DEBUG] Vertex failed with error: {str(e)}")
+            print(f"[GROUNDING DEBUG] Vertex failed with error: {str(e)}")
             # For local development, fall back to direct Gemini API
             if "Reauthentication is needed" in str(e) or "ADC" in str(e) or "auth" in str(e).lower():
-                print(f"[INFO] Vertex auth failed (expected locally), falling back to direct Gemini API")
+                print(f"[GROUNDING DEBUG] AUTH FAILURE - Falling back to direct Gemini API (NO GROUNDING SUPPORT!)")
                 
                 # Use direct Gemini API with API key
                 from app.llm.gemini_direct_adapter import GeminiDirectAdapter
@@ -322,6 +331,10 @@ class LangChainAdapter:
             context: Optional context/evidence pack as separate message
             use_grounding: Enable web search via tools (ACTUALLY WORKS NOW!)
         """
+        # GUARD: Prevent Vertex/Gemini models from being sent to OpenAI
+        if "gemini" in model_name.lower() or "publishers/google" in model_name:
+            raise ValueError(f"Gemini model '{model_name}' incorrectly routed to OpenAI adapter. This is a routing bug.")
+        
         import time
         start_time = time.time()
         

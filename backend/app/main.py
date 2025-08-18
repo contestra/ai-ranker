@@ -59,3 +59,29 @@ app.include_router(grounding_test.router, prefix="/api/grounding-test", tags=["g
 @app.get("/")
 async def root():
     return {"message": "AI Rank & Influence Tracker API", "version": "2.1.0"}
+
+@app.get("/__whoami")
+async def whoami():
+    """Authentication identity endpoint for testing"""
+    import os
+    import google.auth
+    from google.auth.transport.requests import Request
+    
+    try:
+        creds, project = google.auth.default()
+        creds.refresh(Request())
+        
+        return {
+            "project": project,
+            "credential_type": creds.__class__.__name__,
+            "service_account_email": getattr(creds, "service_account_email", None),
+            "impersonated": "Impersonated" in creds.__class__.__name__,
+            "environment_vars": {
+                "GOOGLE_CLOUD_PROJECT": os.getenv("GOOGLE_CLOUD_PROJECT"),
+                "GOOGLE_CLOUD_REGION": os.getenv("GOOGLE_CLOUD_REGION"),
+                "GOOGLE_IMPERSONATE_SERVICE_ACCOUNT": os.getenv("GOOGLE_IMPERSONATE_SERVICE_ACCOUNT"),
+                "CONTESTRA_DISABLE_GEMINI_FALLBACK": os.getenv("CONTESTRA_DISABLE_GEMINI_FALLBACK")
+            }
+        }
+    except Exception as e:
+        return {"error": str(e), "credential_type": "ERROR"}

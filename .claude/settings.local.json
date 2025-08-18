@@ -86,8 +86,42 @@
       "Bash(\"C:\\Users\\leedr\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gcloud.cmd\" auth list)",
       "Bash(\"C:\\Users\\leedr\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gcloud.cmd\" services enable aiplatform.googleapis.com --project=contestra-ai)",
       "Bash(\"C:\\Users\\leedr\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gcloud.cmd\" config set project contestra-ai)",
-      "Bash(\"C:\\Users\\leedr\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gcloud.cmd\" auth application-default login --no-browser --project contestra-ai)"
+      "Bash(\"C:\\Users\\leedr\\AppData\\Local\\Google\\Cloud SDK\\google-cloud-sdk\\bin\\gcloud.cmd\" auth application-default login --no-browser --project contestra-ai)",
+      "Bash(playwright --version)",
+      "Bash(set PYTHONUTF8=1)",
+      "Bash(timeout:*)",
+      "Bash(set GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=vertex-runner@contestra-ai.iam.gserviceaccount.com)",
+      "Bash(set GOOGLE_CLOUD_REGION=europe-west4)",
+      "Bash(sqlite3:*)",
+      "Bash(set GOOGLE_CLOUD_QUOTA_PROJECT=contestra-ai)",
+      "Bash(test:*)",
+      "Bash(true)",
+      "Bash(export GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=\"vertex-runner@contestra-ai.iam.gserviceaccount.com\")",
+      "Bash(export GOOGLE_CLOUD_PROJECT=\"contestra-ai\")",
+      "Bash(export:*)",
+      "Bash(/dev/null)",
+      "Bash(echo $env:APPDATA)",
+      "Bash(copy:*)",
+      "Bash(lsof:*)",
+      "Bash(echo $0)",
+      "Bash(kill:*)",
+      "Bash(ln:*)",
+      "Bash(echo $HOME)",
+      "Bash(echo $USERNAME)",
+      "Bash(echo:*)",
+      "Bash(ls -la \"$APPDATA/gcloud/application_default_credentials.json\")",
+      "Bash(clear)",
+      "Bash(git grep:*)",
+      "Bash(alembic init:*)"
     ],
-    "deny": []
+    "deny": [],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\Users\\leedr\\.config\\gcloud",
+      "C:\\Users\\$env:USERNAME\\AppData\\Roaming",
+      "D:\\c\\Users\\leedr\\AppData\\Roaming",
+      "D:\\c\\Users\\$USER\\AppData\\Roaming",
+      "D:\\d\\OneDrive\\CONTESTRA\\Microapps\\ai-ranker"
+    ]
   }
 }

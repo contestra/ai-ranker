@@ -19,8 +19,18 @@
       "Bash(dir:*)",
       "Bash(git add:*)",
       "Bash(gcloud auth:*)",
-      "Bash(set GOOGLE_APPLICATION_CREDENTIALS=%APPDATA%gcloudapplication_default_credentials.json)"
+      "Bash(set GOOGLE_APPLICATION_CREDENTIALS=%APPDATA%gcloudapplication_default_credentials.json)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(sqlite3:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(playwright --version)",
+      "Bash(node:*)",
+      "Bash(claude-code mcp:*)"
     ],
+    "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "D:\\d\\OneDrive\\CONTESTRA\\Microapps\\ai-ranker",
       "D:\\d D:\\OneDrive\\CONTESTRA\\Microapps\\ai-ranker"

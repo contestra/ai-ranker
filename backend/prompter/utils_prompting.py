@@ -44,11 +44,10 @@ def calc_config_hash(config: dict[str, Any]) -> str:
 
 def is_sqlite(db: Session) -> bool:
     """
-    Check if database is SQLite.
-    Used for handling SQLite-specific behavior.
+    Legacy function - always returns False as SQLite is no longer supported.
+    Kept for backward compatibility during transition.
     """
-    engine_url = str(db.bind.url) if db.bind else ""
-    return "sqlite" in engine_url.lower()
+    return False
 
 
 def infer_provider(model_id: str) -> Optional[str]:

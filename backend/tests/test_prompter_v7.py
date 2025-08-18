@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from prompter.utils_prompting import canonicalize, calc_config_hash, is_sqlite, infer_provider
+import os
 from prompter.provider_probe import _fake_probe_response, probe_langchain
 
 
@@ -144,8 +145,11 @@ class TestWorkspaceIntegration:
         from sqlalchemy.orm import sessionmaker
         from app.database import Base
         
-        # Create in-memory SQLite database for testing
-        engine = create_engine("sqlite:///:memory:")
+        # Use PostgreSQL database for testing
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            pytest.skip("DATABASE_URL not set, skipping database test")
+        engine = create_engine(database_url)
         Base.metadata.create_all(engine)
         SessionLocal = sessionmaker(bind=engine)
         db = SessionLocal()
@@ -181,7 +185,10 @@ class TestDeduplication:
         import uuid
         
         # Create in-memory database
-        engine = create_engine("sqlite:///:memory:")
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            pytest.skip("DATABASE_URL not set, skipping database test")
+        engine = create_engine(database_url)
         Base.metadata.create_all(engine)
         SessionLocal = sessionmaker(bind=engine)
         db = SessionLocal()
@@ -258,7 +265,10 @@ class TestVersionTracking:
         import uuid
         
         # Create in-memory database
-        engine = create_engine("sqlite:///:memory:")
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            pytest.skip("DATABASE_URL not set, skipping database test")
+        engine = create_engine(database_url)
         Base.metadata.create_all(engine)
         SessionLocal = sessionmaker(bind=engine)
         db = SessionLocal()
