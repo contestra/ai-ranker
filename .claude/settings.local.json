@@ -112,7 +112,8 @@
       "Bash(ls -la \"$APPDATA/gcloud/application_default_credentials.json\")",
       "Bash(clear)",
       "Bash(git grep:*)",
-      "Bash(alembic init:*)"
+      "Bash(alembic init:*)",
+      "Bash(alembic upgrade head)"
     ],
     "deny": [],
     "defaultMode": "acceptEdits",
