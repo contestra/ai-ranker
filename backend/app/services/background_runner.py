@@ -198,27 +198,27 @@ class BackgroundTaskRunner:
                 )
             
             # Extract response
-            response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data)
+            response = response_data.get("content", "") if isinstance(response_data, dict) else str(response_data) if response_data else ""
             
             # Check for leaks
             leak_detected = False
             leak_terms = []
             
-            if 'DE' in response:
+            if response and 'DE' in response:
                 leak_detected = True
                 leak_terms.append('DE')
                 print(f"[BACKGROUND] Leak detected: DE found in response")
             
-            if 'Germany' in response:
+            if response and 'Germany' in response:
                 leak_detected = True
                 leak_terms.append('Germany')
                 print(f"[BACKGROUND] Leak detected: Germany found in response")
             
-            if 'Deutschland' in response:
+            if response and 'Deutschland' in response:
                 leak_detected = True
                 leak_terms.append('Deutschland')
             
-            if 'location context' in response.lower():
+            if response and 'location context' in response.lower():
                 leak_detected = True
                 leak_terms.append('location context')
                 print(f"[BACKGROUND] Leak detected: 'location context' found")

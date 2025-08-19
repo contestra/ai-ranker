@@ -268,9 +268,19 @@ class LangChainAdapter:
             
         except Exception as e:
             print(f"[DEBUG] Vertex failed with error: {str(e)}")
-            # For local development, fall back to direct Gemini API
-            if "Reauthentication is needed" in str(e) or "ADC" in str(e) or "auth" in str(e).lower():
-                print(f"[INFO] Vertex auth failed (expected locally), falling back to direct Gemini API")
+            
+            # Check if direct API fallback is allowed
+            allow_direct = settings.allow_gemini_direct
+            
+            # NEVER allow direct API for grounded requests
+            if use_grounding:
+                print(f"[ERROR] Vertex auth failed and grounding requested - cannot use direct API fallback")
+                raise Exception(f"Vertex authentication required for grounded requests: {str(e)}")
+            
+            # Only fall back if explicitly allowed and ungrounded
+            if allow_direct and not use_grounding:
+                print(f"[WARNING] Vertex auth failed - using DIRECT GEMINI API (ungrounded only, limited features)")
+                print(f"[WARNING] This is a diagnostic fallback - set up ADC for proper functionality")
                 
                 # Use direct Gemini API with API key
                 from app.llm.gemini_direct_adapter import GeminiDirectAdapter
@@ -285,8 +295,12 @@ class LangChainAdapter:
                         seed=seed,
                         context=context
                     )
-                    # Add note about fallback
+                    # Mark as fallback for analytics tracking
+                    result["transport"] = "gemini_direct"
                     result["api_used"] = "gemini_direct_fallback"
+                    result["fallback_reason"] = "vertex_auth_failed"
+                    result["warning"] = "Using limited direct API - no grounding parity"
+                    print(f"[METRICS] Gemini Direct API fallback used - ungrounded only")
                     return result
                     
                 except Exception as fallback_e:

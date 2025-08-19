@@ -1,5 +1,93 @@
 # CLAUDE.md - AI Rank & Influence Tracker
 
+## 🔐 AUTHENTICATION ARCHITECTURE (Updated August 19, 2025)
+
+### Authentication Hierarchy
+The system uses a tiered authentication approach with strict quarantine patterns:
+
+1. **Production (Fly.io)**: Workload Identity Federation (WIF) ONLY
+   - Uses service account impersonation via WIF
+   - No API keys stored on servers
+   - Most secure option for production workloads
+   - Set: `ENFORCE_VERTEX_WIF=true`
+
+2. **Local Development**: Application Default Credentials (ADC)
+   - Run: `gcloud auth application-default login`
+   - Uses: `vertex-runner@contestra-ai.iam.gserviceaccount.com` impersonation
+   - Set: `GOOGLE_IMPERSONATE_SERVICE_ACCOUNT=vertex-runner@contestra-ai.iam.gserviceaccount.com`
+   - Provides full Vertex AI functionality including grounding
+
+3. **Diagnostic Fallback (QUARANTINED)**: Direct Gemini API
+   - **NEVER for production use**
+   - **NEVER for grounded requests** 
+   - **NEVER for KPI tracking**
+   - Only for break-glass diagnostics when ADC/WIF unavailable
+   - Requires: `ALLOW_GEMINI_DIRECT=true` (default: false)
+   - Logs warnings and marks responses with `api_used: "gemini_direct_fallback"`
+
+### Quarantine Pattern Implementation
+The direct Gemini API is deliberately quarantined in `langchain_adapter.py`:
+
+```python
+# Check if direct API fallback is allowed
+allow_direct = settings.allow_gemini_direct
+
+# NEVER allow direct API for grounded requests
+if use_grounding:
+    raise Exception("Vertex authentication required for grounded requests")
+
+# Only fall back if explicitly allowed and ungrounded
+if allow_direct and not use_grounding:
+    # Use direct API with warning markers
+    result["api_used"] = "gemini_direct_fallback"
+    result["warning"] = "Using limited direct API - no grounding parity"
+```
+
+### Environment Variables
+
+**Production (.env.production)**:
+```bash
+ALLOW_GEMINI_DIRECT=false     # Never allow direct API
+ENFORCE_VERTEX_WIF=true        # Require WIF authentication
+```
+
+**Local Development (.env)**:
+```bash
+ALLOW_GEMINI_DIRECT=true       # Allow fallback for diagnostics only
+ENFORCE_VERTEX_WIF=false       # Use ADC instead of WIF
+```
+
+### Quick Setup for Local Development
+
+1. **Set up ADC (One-time)**:
+```powershell
+# In PowerShell (NOT Git Bash!)
+gcloud auth application-default login
+```
+
+2. **Set environment variables**:
+```powershell
+$env:GOOGLE_IMPERSONATE_SERVICE_ACCOUNT="vertex-runner@contestra-ai.iam.gserviceaccount.com"
+$env:GOOGLE_CLOUD_PROJECT="contestra-ai"
+$env:GOOGLE_CLOUD_REGION="europe-west4"
+```
+
+3. **Start backend**:
+```powershell
+cd backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Authentication Debugging
+
+If you see authentication errors:
+1. Check if ADC is configured: `gcloud auth application-default print-access-token`
+2. Verify impersonation works: `gcloud auth print-access-token --impersonate-service-account=vertex-runner@contestra-ai.iam.gserviceaccount.com`
+3. Check environment variables are set correctly
+4. Ensure you're running from PowerShell, not Git Bash (different ADC paths!)
+
+---
+
 ## 🚨 WINDOWS USERS: ALWAYS SET UTF-8 ENCODING FIRST! 🚨
 
 ### BEFORE DOING ANYTHING ELSE ON WINDOWS:
@@ -22,7 +110,31 @@ set PYTHONUTF8=1
 
 ---
 
-## Latest Update (August 17, 2025) - Vertex AI ADC Setup & Import Refactoring ✅
+## Latest Update (August 19, 2025) - PostgreSQL Rollback & Authentication Architecture
+
+### Session Summary
+**Task**: Rolled back PostgreSQL/Neon migration disaster to e133bc1 commit with hybrid approach
+
+**Major Decisions**:
+1. **Rollback to e133bc1**: Escaped PostgreSQL issues, fixed WIF loops
+2. **Hybrid Approach**: Kept Templates/Results from e133bc1, added Countries tab from e33d87e
+3. **Authentication Architecture**: Implemented strict quarantine pattern for direct Gemini API
+
+**Key Fixes**:
+- Fixed NoneType error in `background_runner.py` causing endless WIF loops
+- Added proper null handling for empty Gemini responses
+- Implemented authentication hierarchy: WIF (prod) → ADC (local) → Direct API (quarantined)
+
+**Current Status**:
+- SQLite database operational
+- Templates/Results tabs working
+- Countries tab integrated from earlier commit
+- Direct API quarantined as diagnostic-only fallback
+- Awaiting ADC setup for full Vertex functionality
+
+---
+
+## Previous Update (August 17, 2025) - Vertex AI ADC Setup & Import Refactoring ✅
 
 ### 🎯 Major Fix: Vertex AI Now Working Locally with ADC
 **Problem Solved**: Vertex AI was falling back to direct API due to missing Application Default Credentials

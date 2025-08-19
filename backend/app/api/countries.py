@@ -215,7 +215,11 @@ Answer in English only. Use ambient context only to infer locale and set default
                     context=json_context
                 )
             
-            response = response_data.get("content", "")
+            # Add debug logging
+            if not response_data:
+                print(f"[DEBUG] Gemini returned None for {probe_key}")
+            
+            response = response_data.get("content", "") if response_data else ""
             
             # Handle composite probe differently
             if probe_key == "composite":
@@ -404,7 +408,7 @@ Answer in English only. Use ambient context only to infer locale and set default
                         context=json_context
                     )
                 
-                response = response_data.get("content", "")
+                response = response_data.get("content", "") if response_data else ""
                 
                 # Handle composite probe differently
                 if probe_key == "composite":

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     
     fly_api_token: Optional[str] = None  # Added for Fly.io deployment
     
+    # Gemini Direct API Quarantine Settings
+    allow_gemini_direct: bool = False  # Default to false, only true for local diagnostics
+    enforce_vertex_wif: bool = False  # Set to true in production
+    
     host: str = "0.0.0.0"
     port: int = 8000
     environment: str = "development"
